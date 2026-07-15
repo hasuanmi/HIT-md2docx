@@ -38,6 +38,20 @@ def main():
                         help="学位层次（默认 master，仅 bachelor/doctor 触发改写）")
     args = parser.parse_args()
 
+    # 交互式询问学位层次（仅当未显式传 --degree 且运行在终端时）
+    # 设计原则：先按【硕士标准模板】生成（官方 input/封面.docx 版式），
+    # 询问用户本科/硕士/博士后，再在硕士产物上做"硕士→本科/博士"的文字改写。
+    if args.degree == "master" and sys.stdin.isatty():
+        try:
+            ans = input("选择学位层次（本科 / 硕士[默认] / 博士）：").strip()
+        except (EOFError, KeyboardInterrupt):
+            ans = ""
+        if ans in ("本科", "bachelor", "b", "B"):
+            args.degree = "bachelor"
+        elif ans in ("博士", "doctor", "d", "D"):
+            args.degree = "doctor"
+        # 其余（空/硕士/master）保持 master
+
     input_md = os.path.abspath(args.input_md)
     if not os.path.isfile(input_md):
         print(f"错误：文件不存在 {input_md}", file=sys.stderr)
@@ -142,14 +156,24 @@ def main():
         print("[3/3] 层次适配: master（无需改写）")
 
     # ---- 最终输出 ----
+    if not args.no_cover and not cover_ok:
+        # 设计原则：硕士标准模板（官方 input/封面.docx 版式）是生成物的唯一正确底座。
+        # 若封面注入失败，绝不能输出"引擎内置封面"冒充实物——那正是此前同学拿到
+        # 错误封面的根因。直接报错退出，要求先修好封面注入再生成。
+        print("\n❌ 错误：官方封面模板未成功注入，已中止生成。", file=sys.stderr)
+        print("  正确流程应是：先按硕士标准模板（含官方封面）生成，"
+              "再按用户选择的本科/硕士/博士做文字改写。", file=sys.stderr)
+        print("  请检查：", file=sys.stderr)
+        print("    1. input/封面.docx 是否存在且未被 git LFS 截断/损坏", file=sys.stderr)
+        print("    2. 上方 [2/3] 步骤是否有「跳过」或报错信息", file=sys.stderr)
+        if os.path.isfile(temp_docx):
+            os.remove(temp_docx)
+        sys.exit(1)
+
     shutil.move(temp_docx, output_docx)
     print(f"\n完成! 输出: {output_docx}")
-    if not args.no_cover and not cover_ok:
-        print("\n⚠️  警告：官方封面模板可能未成功注入！")
-        print("  封面可能显示引擎内置版式（非学校正式模板）。")
-        print("  请检查：")
-        print("    1. input/封面.docx 是否存在且未被 git LFS 截断")
-        print("    2. 上方 [2/3] 步骤是否有警告信息")
+    if args.degree in ("bachelor", "doctor"):
+        print(f"  （已在硕士标准模板基础上改写为「{args.degree}」封面/页眉/页脚）")
 
 
 if __name__ == "__main__":
