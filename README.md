@@ -49,7 +49,7 @@ hit-thesis-formatter/
 需要 Python ≥ 3.10。
 
 ```bash
-git clone https://github.com/haodongcui/hit-thesis-formatter.git
+git clone https://github.com/484899614-shipi-it/hit-thesis-formatter.git
 cd hit-thesis-formatter
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
 pip install -e .                                   # 可编辑安装，得到 md2docx 命令

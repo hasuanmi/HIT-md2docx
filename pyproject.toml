@@ -35,8 +35,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/haodongcui/hit-thesis-formatter"
-Repository = "https://github.com/haodongcui/hit-thesis-formatter"
+Homepage = "https://github.com/484899614-shipi-it/hit-thesis-formatter"
+Repository = "https://github.com/484899614-shipi-it/hit-thesis-formatter"
 
 [project.scripts]
 md2docx = "thesis_md2docx.main:main"
