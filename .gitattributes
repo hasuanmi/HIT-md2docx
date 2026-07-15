@@ -1,0 +1,10 @@
+# 统一文本行尾，避免 Windows / macOS 间 CRLF/LF 抖动
+* text=auto eol=lf
+
+# 二进制资源不转换
+*.docx binary
+*.png binary
+*.jpeg binary
+*.jpg binary
+*.wmf binary
+*.gif binary

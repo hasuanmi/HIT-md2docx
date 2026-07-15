@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "thesis-md2docx"
+version = "0.1.0"
+description = "哈工大（HIT）学位论文 Markdown -> DOCX/PDF 转换工具（本科/硕士/博士通用）。"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "hit-thesis-formatter contributors" }
+]
+dependencies = [
+  "Pillow>=9.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=6"
+]
+
+keywords = ["markdown", "docx", "pdf", "thesis", "ooxml", "hit", "harbin-institute-of-technology", "master-thesis"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Education",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Text Processing :: Markup",
+]
+
+[project.urls]
+Homepage = "https://github.com/haodongcui/hit-thesis-formatter"
+Repository = "https://github.com/haodongcui/hit-thesis-formatter"
+
+[project.scripts]
+md2docx = "thesis_md2docx.main:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["thesis_md2docx*"]
+
+[tool.setuptools.package-data]
+thesis_md2docx = [
+  "resources/*.jpeg",
+  "resources/*.png",
+  "math/latex2omml_node/*.js",
+  "math/latex2omml_node/package.json",
+  "math/latex2omml_node/package-lock.json",
+  "pdf/backends/word/*.vbs",
+  "pdf/backends/libreoffice/*.xba",
+  "profiles/xju_undergraduate_thesis/format_requirements/*.md",
+  "profiles/xju_undergraduate_thesis/format_requirements/*.docx",
+  "profiles/xju_undergraduate_thesis/format_requirements/*.pdf",
+  "profiles/hit_master_thesis/format_requirements/*",
+]

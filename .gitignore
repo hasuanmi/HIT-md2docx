@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Agent runtime state
+.workbuddy/
+.codebuddy/
+
+# Generated outputs
+output/
+*.bak
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+nul
+
+# 个人/草稿脚本（含本机硬编码路径，不发布到仓库）
+/scripts/
+
+# 生成产物示例
+example/output.docx
+
+# npm 依赖（公式转换用，按需 `npm install --prefix thesis_md2docx/math/latex2omml_node`）
+node_modules/

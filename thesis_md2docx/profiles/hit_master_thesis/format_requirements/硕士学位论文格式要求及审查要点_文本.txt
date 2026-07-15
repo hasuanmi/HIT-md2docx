@@ -1,0 +1,158 @@
+[Heading 1] 硕士学位论文格式要求及审查要点
+[Normal (Web)] 哈尔滨工业大学深圳研究生院
+[Normal (Web)] 硕士学位论文格式要求及审查要点
+[Normal (Web)] 说明：此《硕士学位论文格式要求及审查要点》根据《哈工大研究生学位论文撰写规范》编写制定，重点考虑往届学生易出错的地方，仅供我院研究生撰写学位论文时参考使用。如有遗漏之处或与《撰写规范》不一致之处，以《撰写规范》为准。特别感谢本要点的原始作者徐文福老师。
+[Normal (Web)] 1 正文前的部分
+[Normal (Web)] 1.1 标题
+[Normal (Web)] (1)字数不超过25字；若有副标题，则正标题+副标题字数不超过35字；
+[Normal (Web)] (2)英文标题：封面及扉页均全大写；
+[Normal (Web)] (3)采用名词性短语，不含标点符号；
+[Normal (Web)] (4)标题字号应为黑体二号，且应注意中、英文标题之间以及作者名称之间
+[Normal (Web)] 的行间距。
+[Normal (Web)] 1.2 首页及扉页
+[Normal (Web)] (1)所在单位：深圳研究生院，Shenzhen Graduate School（在职工程硕士按实
+[Normal (Web)] 际所在单位填写）；
+[Normal (Web)] (2)用“Dissertation”不用“Thesis”；
+[Normal (Web)] (3)工学硕士用“Master Degree in Engineering”；工程硕士用“Master’s Degree
+[Normal (Web)] of Engineering”；
+[Normal (Web)] (4)学校代码和密级的冒号应该对齐。
+[Normal (Web)] 1.3 目录
+[Normal (Web)] (1)目录里的“ABSTRACT”可以写成“Abstract”；
+[Normal (Web)] (2)目录章节编号要求编到3级标题，即X.X.X；
+[Normal (Web)] (3)英文摘要标题首字母大写“Abstract”。
+[Normal (Web)] 1.4 摘要
+[Normal (Web)] (1)为独立短文，不用“首先、其次、然后……”或“(1)、(2)、(3)……”；
+[Normal (Web)] (2)摘要字数500~1000字，应主要反映课题研究背景，研究问题，解决方法
+[Normal (Web)] 及评估结果；
+[Normal (Web)] (3)英文摘要做到无病句，无语法错误，尽量用简短句式，而不是复合句、
+[Normal (Web)] 长句型。
+[Normal (Web)] 1.5 关键词
+[Normal (Web)] (1)3~6个；
+[Normal (Web)] (2)中文关键词用分号“；”分开；
+[Normal (Web)] (3)英文用关键词逗号“，”，且所有字母小写。
+[Normal (Web)] 2 排版要求
+[Normal (Web)] 2.1 页面设置（版芯）
+[Normal (Web)] (1)A4标准纸(210mm?297mm)；
+[Normal (Web)] (2)版芯：150mm?(240mm±2mm)，包括页眉、页码，每页约33行，33列；
+[Normal (Web)] (3)行距：章标题上、下行距10mm（段前一行、段后0.8行）；节标题上、
+[Normal (Web)] 下行距7-8mm（段前0.5行、段后0.5行）；条标题上、下行距6-7mm（段
+[Normal (Web)] 前0.5行、段后0.5行）；款标题上、下行距3-4mm（段前0.0行、段后
+[Normal (Web)] 0.0行）。
+[Normal (Web)] 2.2 字体
+[Normal (Web)] (1)汉字用“宋体”；全文的数字（包括公式标号、图标、表标等）、英文单
+[Normal (Web)] 词（包括英文标题）、字母、物理量单位（如mm）等用“Times New Roman”；
+[Normal (Web)] (2)矩阵、矢量用“粗、斜体”，如矢量r；单变量用“斜体”（不加粗），如
+[Normal (Web)] x, y；
+[Normal (Web)] (3)上下标：有变量含义的用斜体，如x i；数字、单词首字母、单位等无变
+[Normal (Web)] 量含义的用正体，如x1，矩阵转置A T（T为转置Transpose的首字母），
+[Normal (Web)] 5o；
+[Normal (Web)] (4)单位符号与数字之间应该加空格，如采用“……长度为3 cm”，而不采
+[Normal (Web)] 用“……长度为3cm”。
+[Normal (Web)] 2.3 字号
+[Normal (Web)] (1)正文、公式中用小4号（对宋体而言）或12pt（对Times New Roman而
+[Normal (Web)] 言）；
+[Normal (Web)] (2)图、表中的文字、题注（图X-1、表X-1）等用5号或10pt。
+[Normal (Web)] 2.4 图、表、公式
+[Normal (Web)] (1)编号：图1-1、表1-1、(1-1)；
+[Normal (Web)] (2)插图之前，文中必须有关于本插图的提示，如“见图1-1”、“如图1-1所
+[Normal (Web)] 示”等，各级标题后面不可直接插图；
+[Normal (Web)] (3)图、表与其题注同页；
+[Normal (Web)] (4)图的各分图编号用，a)、b)等，且各分图同页；
+[Normal (Web)] (5)图表需清楚，图片没模糊毛边，非出自作者自己的图片或数据需在恰当
+[Normal (Web)] 位置给明出处：图片在题注中给出，表格中数据以上标形式给出；
+[Normal (Web)] (6)坐标及其单位：“t(s)”或“时间(s)”，不能用斜杠的形式，如“t/s”；
+[Normal (Web)] (7)当前页不够一个表时，采用“续表”的形式，即下一页右上角用“表2-1
+[Normal (Web)] （续表）”表示为表2-1的续表，并重复表头（即表的第一行）；
+[Normal (Web)] (8)行内公式也需采用公式编辑器编写，如“这里2
+[Normal (Web)] x=mm”；
+[Normal (Web)] d=cm，12
+[Normal (Web)] (9)图表上下与文中文字间需留一定位置编排。
+[Normal (Web)] 2.5 页末空白
+[Normal (Web)] 每页末尾部分不能留空白，应通过调整图、文字的位置，尽量使空白消除。
+[Normal (Web)] （建议，每页末尾不超过3行）
+[Normal (Web)] 3 正文撰写
+[Normal (Web)] 3.1 绪论
+[Normal (Web)] “本文的研究内容”中不用“第一章、第二章等”，而需用“本文的主要研究内容如下：
+[Normal (Web)] (1)……；
+[Normal (Web)] (2)……；
+[Normal (Web)] (3)……。
+[Normal (Web)] 3.2 论文主体
+[Normal (Web)] (1)正文字数：硕士学位论文一般为3~5万字（含图表），目录后及结论前的
+[Normal (Web)] 篇幅不少于35页；
+[Normal (Web)] (2)章节及各章标题：字数在15字以内；
+[Normal (Web)] (3)除《第一章绪论》外，各章最后一节为“本章小结”；实验方法或材料等
+[Normal (Web)] 章节可不写。
+[Normal (Web)] (4)正文中所有“（）”应为中文格式。
+[Normal (Web)] 3.3 结论
+[Normal (Web)] (1)分(1)、(2)、(3)列出所取得的主要成果，每条成果尽量用“提出了”，“建
+[Normal (Web)] 立了”；
+[Normal (Web)] (2)2000字以内，不加章标题序号，不标注引用文献；
+[Normal (Web)] 4 参考文献
+[Normal (Web)] 4.1 数量及引用要求
+[Normal (Web)] (1)数量：硕士学位论文不少于40篇，英文文献不少于总数的1/2，近5年
+[Normal (Web)] 文献不少于总数的1/3，且要包含近2年的文献；
+[Normal (Web)] (2)对于间接引用，文献标注在所引内容最后一个字的右上角，如“……的
+[Normal (Web)] 研究得到了广泛关注[7]”。单篇文献[1]（小4号字体）、多篇文献[7, 9, 11-13]，同一文献多次引用时标注页码，如规定[3]92；
+[Normal (Web)] (3)对于直接引用，如“文献[23]研究了……的表达方式时，[23]不用上标，
+[Normal (Web)] 与正文排齐。
+[Normal (Web)] 4.2 引用范例
+[Normal (Web)] 4.2.1 期刊
+[Normal (Web)] 中：作者1，作者2，作者3，等. 标题名[J]. 期刊名，年，卷（期）：页码.
+[Normal (Web)] 英：Author A, Author B, Author C, et al. 标题名[J]. 期刊名，年，卷（期）：页码.
+[Normal (Web)] 如：
+[Normal (Web)] [1]李晓东，张庆红，叶瑾琳. 气候学研究的若干理论问题[J]. 北京大学学报，
+[Normal (Web)] 1999，35（1）：101-106.
+[Normal (Web)] [2]Helfat C E, Raubitschek R S. Product Sequencing: Co Evolution of
+[Normal (Web)] Knowledge, Capabilities and Products[J]. Strategic Management Journal,
+[Normal (Web)] 2000（21）：961-979.
+[Normal (Web)] 4.2.2 会议论文
+[Normal (Web)] Author A, Author B, Author C, et al. 标题名[C]//会议名,出版社地点：出版社，年份：页码。
+[Normal (Web)] 如：
+[Normal (Web)] [3]张佐光，张晓宏，仲伟虹，等. 多相混杂纤维复合材料拉伸行为分析[C]//
+[Normal (Web)] 第九届全国复合材料学术会议论文集（下册）. 北京：世界图书出版公
+[Normal (Web)] 司，1996：410-416.
+[Normal (Web)] 4.3 注意事项
+[Normal (Web)] 英文作者名的规则：姓(全单词，首字母大写) 名（仅首字母，大写，不加点）；
+[Normal (Web)] 论文标题的每个单词首字母大写。
+[Normal (Web)] 5 格式自查要点
+[Normal (Web)] 5.1 首页、扉页、摘要、目录
+[Normal (Web)] (1)首页、扉页的英文标题所有字母大写；
+[Normal (Web)] (2)学位论文的英文翻译“Dissertation”；
+[Normal (Web)] (3)摘要：段落首句无“首先、其次、再次”及“(1)、(2)”；
+[Normal (Web)] (4)关键词：中文关键词用“；”
+[Normal (Web)] 英文关键词用“，”分开，每个单词所有字母小写（除专有名词外）；
+[Normal (Web)] (5)目录：“ABSTRACT”全大写，编号到3级标题；
+[Normal (Web)] 5.2 正文
+[Normal (Web)] (1)绪论中的“本文研究内容”后面不用“第一章……、第二章……”而用
+[Normal (Web)] “本文的主要研究内容如下：”然后用(1)、(2)、(3)列出各主要内容；
+[Normal (Web)] (2)页面设置：正文版芯33行，宋体、Times New Roman字体，小4号、12pt
+[Normal (Web)] 字号；
+[Normal (Web)] (3)项标题题序空4个半角字符书写，内容空4个半角字符接排；
+[Normal (Web)] (4)图、表中的文字5号、10pt字号；
+[Normal (Web)] (5)插图之前，文中必须有关于本插图的提示，如“见图1-1”、“如图1-1所
+[Normal (Web)] 示”等。各级标题后面不可直接插图。
+[Normal (Web)] (6)矩阵、矢量用粗斜体；单变量用斜体（不加粗）；单位（如mm，o）、矩
+[Normal (Web)] 阵转置符号“T”等用正体；
+[Normal (Web)] (7)缩写术语在正文中第一次出现，必须给出术语完整形式；
+[Normal (Web)] (8)图、表、公式的编号按2-1等形式（即含章标题）；
+[Normal (Web)] (9)分图编号用“a)、b)”；各分图同页；
+[Normal (Web)] (10)图、表、公式编号正确、连续；
+[Normal (Web)] (11)图、表、公式在正文中被正确引用（常见引用的图和希望被引的图不一
+[Normal (Web)] 致）；
+[Normal (Web)] (12)形如“如下图3-5所示：”应为“如图3-5所示。”，“如下表3-5所示：”
+[Normal (Web)] 应为“如表3-5所示。”；
+[Normal (Web)] (13)图中的横纵坐标的单位用括号，如t(s)或时间(s)，不能用斜杠的形式，
+[Normal (Web)] 如“t/s”；
+[Normal (Web)] (14)同一页不够表示表时，在下一页采用“表3-1（续表）”的形式；
+[Normal (Web)] (15)表格为三线表的形式；
+[Normal (Web)] (16)正文中的序号不能再用“1、2、……”而用“(1)、(2)……”，更下一级
+[Normal (Web)] 别用“①、②……”或“(a)、(b)”等；
+[Normal (Web)] (17)各页末尾不能留空白（尽可能小）；
+[Normal (Web)] (18)“文献[23]XXX”中的文献号[23]不用上标，与正文排齐。
+[Normal (Web)] 5.3 参考文献
+[Normal (Web)] (1)数量：不少于40篇，英文文献不少于总数的1/2，近5年文献不少于总
+[Normal (Web)] 数的1/3，且要包含近2年的文献；
+[Normal (Web)] (2)英文作者名：姓（全单词，首字母大写），名（仅首字母，大写，不加点）；
+[Normal (Web)] (3)论文标题的每个单词首字母大写；
+[Normal (Web)] (4)期刊、会议等的引用是否按范例的规则；
+[Normal (Web)] (5)采用Word中“项目（英文item）”格式，自动对齐每一行。
