@@ -31,11 +31,19 @@ HIT-md2docx/
 │   ├── references/          # 哈工大格式规范、自查清单、范例 MD
 │   └── agents/openai.yaml
 ├── input/                   # 资源：封面.docx（官方封面模板）+ heading_translations.json（中英文目录映射）
-├── example/                 # 自包含样例：thesis-demo-hit.md + 图片 + 翻译表
+├── example/                 # 自包含样例
+│   ├── thesis-demo-hit.md                               # 最小可跑 demo（含图片、翻译表）
+│   ├── 论文_平台反垄断与研发投入.md                       # 真实范文：md 源（引擎可直接消费）
+│   └── 论文_平台反垄断与研发投入_HIT硕士规范版.docx       # 同上范文的成品 docx，供审阅/对照版式
+├── thesis-specs/            # 论文规范文件：模板.docx / 封面.docx / 硕士学位论文格式要求及审查要点.docx
 ├── md2docx.py               # CLI 入口
 ├── 模板.docx                # 哈工大论文完整模板（参考用）
 ├── pyproject.toml / requirements.txt / LICENSE / README.md / .gitignore
 ```
+
+> **想直接看效果 / 对照规范？**
+> - 真实范文（md + 成品 docx）已放进 `example/`：`论文_平台反垄断与研发投入.md` 与 `论文_平台反垄断与研发投入_HIT硕士规范版.docx`，clone 后即可审阅版式。
+> - 哈工大官方模板、封面、审查要点统一放在 `thesis-specs/`（详见该目录 `README.md`）。
 
 ---
 
