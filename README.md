@@ -55,20 +55,42 @@ pip install -e .                                   # 可编辑安装，得到 md
 npm install --prefix thesis_md2docx/math/latex2omml_node
 ```
 
-### 2. 生成 Word
+### 2. 生成 Word（⚠ 必须用 generate.py）
+
+> **不要直接跑 `md2docx docx` 或 `python -m thesis_md2docx.main docx`！**
+> 那只会生成基础封面（近似版式），且不会注入哈工大官方封面模板。
+> **必须使用下面的一条龙脚本**，它会自动完成：引擎生成 → 注入官方封面模板 → 学位层次适配。
 
 ```bash
-# 方式 A：直接用 md2docx 命令
+# 硕士论文（默认）——生成带官方封面的完整 docx
+python generate.py 你的论文.md 输出.docx
+
+# 本科 / 博士（自动改写封面/页眉页脚中的学位文字）
+python generate.py 你的论文.md 输出.docx --degree bachelor    # 本科
+python generate.py 你的论文.md 输出.docx --degree doctor      # 博士
+
+# 只要引擎内置封面、不注入官方模板（调试用）
+python generate.py 你的论文.md 输出.docx --no-cover
+```
+
+**输出效果**：封面 = 哈工大官方 `input/封面.docx` 模板（含校徽/表格/精确版式），不是引擎程序拼的文字版。找不到模板时会自动降级并打印提示。
+
+### 3. 高级用法：单独调用引擎（可选）
+
+如果你只需要基础排版、不需要官方封面模板：
+
+```bash
+# 直接调用引擎（⚠ 生成的封面是近似版式，非学校正式模板）
 md2docx docx --profile hit-master-thesis 你的论文.md 论文.docx
 
-# 方式 B：用 python -m 调引擎
+# 或等价的 python -m 调用
 python -m thesis_md2docx.main docx --profile hit-master-thesis 你的论文.md 论文.docx
 # 注：docx 子命令的输出是「位置参数」（不是 -o），省略时默认生成 <输入同名>.docx
 ```
 
-默认 profile 就是 `hit-master-thesis`，`--profile` 可省略。
+> 默认 profile 就是 `hit-master-thesis`，`--profile` 可省略。**绝大多数情况下请用第 2 步的 `generate.py`，不要用本步骤。**
 
-### 3. 导出 PDF（可选）
+### 4. 导出 PDF（可选）
 
 ```bash
 # all 子命令：md → docx → pdf（pdf 子命令只接受 docx 输入，这里用 all 一步到位）
@@ -84,8 +106,13 @@ md2docx all --profile hit-master-thesis 你的论文.md 论文.docx 论文.pdf -
 
 ## 常见问题
 
+- **⚠ 封面显示「本科学位论文」/「学士学位」/ 版式不对？** 你可能：
+  1. **用错了命令** —— 必须用 `python generate.py 论文.md 输出.docx`（第 2 步），不要直接跑 `md2docx docx`
+  2. **clone 错了仓库** —— 确认是 `https://github.com/484899614-shipi-it/HIT-md2docx.git`，不是其他仓库
+  3. **本地有旧版 thesis_md2docx 安装** —— 在新 clone 的目录里重新跑 `pip install -e .`，确保引擎指向当前仓库
+  正确的封面应显示 **「硕士学位论文」**（硕士）/ **「Dissertation for the Master Degree」**（英文），且版式与学校下发的 Word 模板一致。
+
 - **英文目录没出现 / 是中文？** 确认 `heading_translations.json` 和你的 md 在**同一目录**。
-- **封面版式不对？** 把学校下发的官方 `封面.docx` 放到 `input/封面.docx`，再跑 `cover_inject.py`；找不到模板时引擎会优雅跳过，仅生成基础封面。
 - **公式显示为 LaTeX 原文而非公式？** 需要 Node.js 环境（引擎用 `math/latex2omml_node` 转 OMML）；缺失时保留原文，不影响其余排版。
 - **章节序号错乱？** 检查一级标题是否写成 `# 数字 标题`；中文数字章号请先跑 `md_to_fordocx.py`。
 
