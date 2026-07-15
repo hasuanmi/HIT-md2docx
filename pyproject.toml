@@ -16,11 +16,6 @@ dependencies = [
   "Pillow>=9.0"
 ]
 
-[project.optional-dependencies]
-dev = [
-  "pytest>=6"
-]
-
 keywords = ["markdown", "docx", "pdf", "thesis", "ooxml", "hit", "harbin-institute-of-technology", "master-thesis"]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -32,6 +27,11 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Topic :: Text Processing :: Markup",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=6"
 ]
 
 [project.urls]

@@ -12,6 +12,7 @@ CANDIDATES=(
   "${THESIS_MD2DOCX_REPO:-}"
   "$REPO_ROOT"
   "$SKILL_DIR"
+  "D:/essay/thesis/HIT-md2docx"
   "$HOME/.workbuddy/plugins/marketplaces/my-experts/plugins/HIT-md2docx/skills/hitmd2docx"
 )
 REPO=""
@@ -23,5 +24,9 @@ if [ -z "$REPO" ]; then
   echo "ERROR: 找不到 thesis_md2docx 引擎。请设置 THESIS_MD2DOCX_REPO 指向含 thesis_md2docx/ 的目录。" >&2
   exit 2
 fi
-export PYTHONPATH="$REPO:${PYTHONPATH}"
-exec "$PY" -m thesis_md2docx.main "$@"
+# 委托给 run_engine.py：它用 sys.path.insert(0, REPO) 强制前置引擎路径，
+# 可规避「其他可编辑安装 / PYTHONPATH 被 .pth 抢先」导致的引擎解析错误。
+# 先 cd 到脚本目录、用相对名调用，避免 Git Bash 的 MSYS 绝对路径转换把 HERE 改坏。
+export THESIS_MD2DOCX_REPO="$REPO"
+cd "$HERE"
+exec "$PY" run_engine.py "$@"
