@@ -81,13 +81,19 @@ _H1_TITLE = re.compile(r"^#\s+(?!第[一二三四五六七八九十零\d]+章)(?
 # 固定前置里的“论文题目：xxx”行，用于与正文 H1 同步
 _FM_TITLE_LINE = re.compile(r"^(论文题目\s*[:：]).*$")
 
+# 这些一级标题不是论文题目，extract_title 必须跳过，否则会把摘要误当题目
+_TITLE_SKIP = {"摘要", "ABSTRACT", "Abstract"}
+
 
 def extract_title(text: str) -> str:
-    """从正文 md 取第一处 H1 题目（非数字章、非二级）。取不到返回空串。"""
+    """从正文 md 取第一处 H1 题目（非数字章、非二级、非 摘要/ABSTRACT）。取不到返回空串。"""
     for line in text.splitlines():
         m = _H1_TITLE.match(line.strip())
         if m:
-            return m.group(1).strip()
+            cand = m.group(1).strip()
+            if cand in _TITLE_SKIP:
+                continue
+            return cand
     return ""
 
 
@@ -125,8 +131,14 @@ def inject_front_matter(text: str, front_matter: str) -> str:
             insert_at = i + 1
             break
     if insert_at is None:
-        # 正文无 H1：整块置顶
-        return fm_block + "\n\n" + text
+        # 正文无 H1 题目（如用户把 `# 摘要` 写在最前）：把固定前置置顶，并尝试
+        # 从封面信息里的「论文题目：」生成 `# 题目` 一级标题，使引擎拿到正确的
+        # 封面题目（与封面信息一致），而不是把 摘要 误判为题目。
+        m = re.search(r"论文题目\s*[:：]\s*(.+)", front_matter)
+        title_val = m.group(1).strip() if m else ""
+        head = ["# " + title_val, ""] if title_val else []
+        tail_nl = "\n" if text.endswith("\n") else ""
+        return "\n".join(head + [fm_block, "", text]) + tail_nl
     head = lines[:insert_at]
     tail = lines[insert_at:]
     merged = head + ["", fm_block, ""] + tail
@@ -231,6 +243,33 @@ def strip_hr_before_heading(text: str) -> tuple[str, int]:
                 continue
         out.append(line)
         i += 1
+    tail = "\n" if text.endswith("\n") else ""
+    return "\n".join(out) + tail, n
+
+
+# 摘要/ABSTRACT 误写为一级标题 → 降级为二级
+# ---------------------------------------------------------------------------
+# 引擎只把 `## 摘要` 当作摘要小节。若用户把 `# 摘要` 写成一级标题：
+#   - extract_title 会把它误判为论文题目（封面题目变成「摘要」）；
+#   - 其后的摘要正文被当成正文/标题区，摘要整段丢失。
+# 预处理阶段把 `# 摘要` / `# ABSTRACT` / `# Abstract` 降为 `##`，零引擎改动
+# 即让摘要正确归位。已为 `##` 的不受影响（正则只匹配单个 `#`）。
+_ABSTRACT_H1 = re.compile(r"^#\s+(摘要|ABSTRACT|Abstract)\s*$", re.IGNORECASE)
+
+
+def normalize_abstract_headings(text: str) -> tuple[str, int]:
+    """把误写为一级标题的 `# 摘要`/`# ABSTRACT`/`# Abstract` 降为二级 `##`。
+
+    返回 (新文本, 降级处数)。幂等：已为二级的不重复处理。
+    """
+    out: list[str] = []
+    n = 0
+    for line in text.splitlines():
+        if _ABSTRACT_H1.match(line.strip()):
+            out.append("## " + line.lstrip("#").strip())
+            n += 1
+        else:
+            out.append(line)
     tail = "\n" if text.endswith("\n") else ""
     return "\n".join(out) + tail, n
 
@@ -503,6 +542,9 @@ def main(argv: list[str] | None = None) -> int:
 
     text = src.read_text(encoding="utf-8")
 
+    # 摘要/ABSTRACT 若被误写成一级标题，先降级为二级（避免被误当论文题目、摘要丢失）
+    text, a = normalize_abstract_headings(text)
+
     # ---- 公式预处理：纯文本计量公式 → $$...$$ 块 ----
     # 引擎的 MathConverter（temml → mathml2omml）只识别 $$...$$ 展示公式块，
     # 源稿里大量公式是“RD_it = α₀ + …  (1)”这种纯文本写法，若不转换就会被
@@ -576,6 +618,8 @@ def main(argv: list[str] | None = None) -> int:
     dst.write_text(converted, encoding="utf-8")
 
     print(f"[ok] 转换 {n} 个章标题（中文章号→数字章号）")
+    if a:
+        print(f"[ok] 降级 {a} 个误写的一级摘要标题（# 摘要→## 摘要，避免被误当题目）")
     if eq_count:
         print(f"[ok] 提取 {eq_count} 个纯文本计量公式 → $$...$$ 展示公式块（引擎转 OMML 原生公式）")
     if m:

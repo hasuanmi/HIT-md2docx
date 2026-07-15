@@ -150,31 +150,82 @@ def _split_en(en, maxc=56):
     return line1, " ".join(words[j:])
 
 
+# 封面固定标签（非题目），用于从模板中识别并排除，避免误把标签当题目替换
+_COVER_FIXED_LABELS = (
+    "哈尔滨工业大学", "本科学位论文", "硕士学位论文", "博士学位论文",
+    "国内图书分类号", "国际图书分类号", "学校代码", "密级",
+    "Classified Index", "U.D.C", "Dissertation for the Master Degree",
+    "Candidate", "Supervisor", "Academic Degree Applied for", "Speciality",
+    "Affiliation", "Date of Defence", "Degree-Conferring", "授予学位单位",
+    "所在单位", "申请学位", "导师", "答辩日期", "Harbin Institute of Technology",
+    "（Times New Roman",
+)
+
+
+def _is_cover_label(t: str) -> bool:
+    return any(k in t for k in _COVER_FIXED_LABELS)
+
+
+def _cjk_len(t: str) -> int:
+    return sum(1 for c in t if "一" <= c <= "鿿")
+
+
+def _en_len(t: str) -> int:
+    return sum(1 for c in t if c.isascii() and c.isalpha())
+
+
 def replace_cover_titles(cover: Document, cn, en):
+    """把模板封面的中/英文题目替换为论文题目（对任意论文生效，不再写死示例题目）。
+
+    定位策略（基于「题目 = 封面中最长的非标签文本段落」这一不变式）：
+      - 中文题目：替换所有「中文长度 >= 8 且非固定标签、非格式提示」的段落
+        （中/英文封面各一处题目都会命中）；
+      - 英文题目：替换所有「纯英文且长度 >= 20 且非固定标签」的段落，并把其后续
+        英文续行清空或填入按模板断行规则得到的第二行。
+    题目段落可能出现在中文封面与英文封面两处，故用循环而非「取最长一处」。
+    """
     if not cn and not en:
         return 0
     paras = cover.paragraphs
-    en1, en2 = _split_en(en) if en else (None, None)
     n = 0
-    for i, p in enumerate(paras):
-        t = p.text.strip()
-        if not t:
-            continue
-        if cn and ("网络互动" in t or "女性弱势群体" in t or "抗逆力" in t):
-            if _replace_title_text(p, cn):
-                n += 1
-            continue
-        if en and t.upper().startswith("RESEARCH") and (
-                "PROMOTION" in t.upper() or "VULNERABLE" in t.upper()
-                or "FEMALE" in t.upper()):
-            if _replace_title_text(p, en1):
+
+    if cn:
+        for p in paras:
+            t = p.text.strip()
+            if not t or _is_cover_label(t) or t.lstrip().startswith("（"):
+                continue
+            if _cjk_len(t) >= 8:
+                if _replace_title_text(p, cn):
+                    n += 1
+
+    if en:
+        en1, en2 = _split_en(en)
+        for i, p in enumerate(paras):
+            t = p.text.strip()
+            if not t or _is_cover_label(t):
+                continue
+            if _en_len(t) >= 20 and _cjk_len(t) == 0:
+                if _replace_title_text(p, en1):
+                    n += 1
+                # 续行：清空或填入第二行，直到遇到下一个固定标签
                 j = i + 1
-                while j < len(paras) and not paras[j].text.strip():
+                second_filled = False
+                while j < len(paras):
+                    tt = paras[j].text.strip()
+                    if not tt:
+                        j += 1
+                        continue
+                    if _is_cover_label(tt):
+                        break
+                    if _cjk_len(tt) == 0 and _en_len(tt) > 0:
+                        if en2 and not second_filled:
+                            _replace_title_text(paras[j], en2)
+                            second_filled = True
+                            n += 1
+                        else:
+                            for r in paras[j].runs:
+                                r.text = ""
                     j += 1
-                if j < len(paras):
-                    _replace_title_text(paras[j], en2)
-                n += 1
-            continue
     return n
 
 

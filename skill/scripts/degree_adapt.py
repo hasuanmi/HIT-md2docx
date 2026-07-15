@@ -52,6 +52,30 @@ ACHIEVEMENTS_TITLE = "攻读硕士学位期间取得的科研成果"
 # 封面区在「第一个一级标题 / 摘要 / 声明」之前结束
 STOP_TEXTS = {"摘要", "ABSTRACT", "Abstract", "声明", "原创性声明"}
 
+# HIT 学位专属短语（几乎不可能出现在论文正文中），用于全文匹配。
+# 引擎常把「封面信息表」放在 摘要 之后，导致封面区边界提前关闭而漏改；
+# 用这些短语在全文范围内兜底，确保 bachelor/doctor 下无残留「硕士/master」。
+DEGREE_PHRASES = [
+    "硕士学位论文",
+    "硕士研究生",
+    "Dissertation for the Master Degree",
+    "Master Degree in",
+    "Master's Study",
+    "攻读硕士学位期间取得的科研成果",
+]
+
+# 声明区起始标记（原创性声明 / 版权使用授权书）
+DECL_START_MARKERS = [
+    "原创性声明",
+    "学位论文版权使用授权书",
+    "学位论文版权",
+    "版权使用授权书",
+]
+
+# 机构名保护：声明区「研究生」→「本科生」时，绝不能把「深圳研究生院」等
+# 机构名误改成「深圳本科生院」。
+INSTITUTION_PROTECT = "研究生院"
+
 
 def w(tag: str) -> str:
     return f"{{{W}}}{tag}"
@@ -159,6 +183,34 @@ def _para_text(p_elem) -> str:
     return "".join(t.text or "" for t in p_elem.iter(w("t")))
 
 
+def _tbl_text(tbl_elem) -> str:
+    return "".join(t.text or "" for t in tbl_elem.iter(w("t")))
+
+
+def _contains_degree_phrase(text: str) -> bool:
+    """块内是否含 HIT 学位专属短语（封面信息表 / 英文科研成果标题等）。"""
+    return any(p in text for p in DEGREE_PHRASES)
+
+
+def _is_decl_start(p_elem) -> bool:
+    t = _para_text(p_elem).strip()
+    return any(m in t for m in DECL_START_MARKERS)
+
+
+def _decl_replace(text: str) -> str:
+    """声明区「研究生」→「本科生」，保护机构名「研究生院」。"""
+    return (text.replace(INSTITUTION_PROTECT, "\x00")
+                .replace("研究生", "本科生")
+                .replace("\x00", INSTITUTION_PROTECT))
+
+
+def adapt_declaration_block(elem) -> None:
+    """声明区逐跑替换「研究生」→「本科生」，保护机构名。"""
+    for r in block_runs(elem):
+        if r.text and "研究生" in r.text:
+            r.text = _decl_replace(r.text)
+
+
 def _is_stop(p_elem) -> bool:
     style_id = ""
     ppr = p_elem.find(w("pPr"))
@@ -177,17 +229,26 @@ def _adapt_document(xml_bytes: bytes, zh: str, en_cap: str, en_low: str) -> byte
     if body is None:
         return xml_bytes
     in_cover = True
+    in_declaration = False
     for child in list(body):
         tag = etree.QName(child).localname
         if tag == "p":
             if in_cover and _is_stop(child):
                 in_cover = False
+            if _is_decl_start(child):
+                in_declaration = True
             if in_cover:
                 adapt_block(child, zh, en_cap, en_low)
-            elif ACHIEVEMENTS_TITLE in _para_text(child):
+            elif _contains_degree_phrase(_para_text(child)):
+                # 封面信息表等落在 摘要 之后，仍要改写学位字样
                 adapt_block(child, zh, en_cap, en_low)
+            elif in_declaration:
+                # 声明区「研究生」→「本科生」，保护机构名「研究生院」
+                adapt_declaration_block(child)
         elif tag == "tbl":
             if in_cover:
+                adapt_block(child, zh, en_cap, en_low)
+            elif _contains_degree_phrase(_tbl_text(child)):
                 adapt_block(child, zh, en_cap, en_low)
         # sectPr 等其他元素跳过
     return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
