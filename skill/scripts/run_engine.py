@@ -13,7 +13,7 @@ CANDIDATES = [
     REPO_ROOT,
     SKILL_DIR,
     os.path.expanduser(
-        "~/.workbuddy/plugins/marketplaces/my-experts/plugins/hit-thesis-formatter/skills/hitmd2docx"
+        "~/.workbuddy/plugins/marketplaces/my-experts/plugins/HIT-md2docx/skills/hitmd2docx"
     ),
 ]
 REPO = ""

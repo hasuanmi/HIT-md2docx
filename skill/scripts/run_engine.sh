@@ -12,7 +12,7 @@ CANDIDATES=(
   "${THESIS_MD2DOCX_REPO:-}"
   "$REPO_ROOT"
   "$SKILL_DIR"
-  "$HOME/.workbuddy/plugins/marketplaces/my-experts/plugins/hit-thesis-formatter/skills/hitmd2docx"
+  "$HOME/.workbuddy/plugins/marketplaces/my-experts/plugins/HIT-md2docx/skills/hitmd2docx"
 )
 REPO=""
 for c in "${CANDIDATES[@]}"; do

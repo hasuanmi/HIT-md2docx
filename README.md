@@ -1,4 +1,4 @@
-# hit-thesis-formatter
+# HIT-md2docx
 
 哈工大（HIT）学位论文 **Markdown → Word (.docx) / PDF** 转换工具，本科 / 硕士 / 博士通用。
 
@@ -25,7 +25,7 @@
 ## 目录结构
 
 ```
-hit-thesis-formatter/
+HIT-md2docx/
 ├── thesis_md2docx/          # 转换引擎（已修复的 HIT profile）
 ├── skill/                   # WorkBuddy skill 编排层（可选，WB 用户用）
 │   ├── SKILL.md
@@ -49,8 +49,8 @@ hit-thesis-formatter/
 需要 Python ≥ 3.10。
 
 ```bash
-git clone https://github.com/484899614-shipi-it/hit-thesis-formatter.git
-cd hit-thesis-formatter
+git clone https://github.com/484899614-shipi-it/HIT-md2docx.git
+cd HIT-md2docx
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
 pip install -e .                                   # 可编辑安装，得到 md2docx 命令
 

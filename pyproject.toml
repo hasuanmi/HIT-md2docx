@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
-  { name = "hit-thesis-formatter contributors" }
+  { name = "HIT-md2docx contributors" }
 ]
 dependencies = [
   "Pillow>=9.0"
@@ -35,8 +35,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/484899614-shipi-it/hit-thesis-formatter"
-Repository = "https://github.com/484899614-shipi-it/hit-thesis-formatter"
+Homepage = "https://github.com/484899614-shipi-it/HIT-md2docx"
+Repository = "https://github.com/484899614-shipi-it/HIT-md2docx"
 
 [project.scripts]
 md2docx = "thesis_md2docx.main:main"
