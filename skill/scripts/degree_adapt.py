@@ -88,7 +88,8 @@ def find_spans(logical: str, zh: str, en_cap: str, en_low: str):
     """扫描 logical，返回有序、不重叠的 (start, end, replacement) 列表。
 
     - 中文优先匹配长词「硕士研究生」(5字)，再「硕士」(2字)；
-      硕士→zh；硕士研究生→「本科生研究生」/「博士研究生」/「硕士研究生」。
+      硕士→zh；硕士研究生→「本科生」/「博士研究生」/「硕士研究生」。
+      （注意：本科封面官方模板写的是「本科生」而非「本科生研究生」）
     - 英文匹配 master('s)?（大小写不敏感），按首字母大小写选择 Bachelor/Doctor
       或 bachelor/doctor，并保留 's。
     """
@@ -104,7 +105,7 @@ def find_spans(logical: str, zh: str, en_cap: str, en_low: str):
             i += len(orig)
             continue
         if logical[i:i + 5] == "硕士研究生":
-            rep = {"本科": "本科生研究生", "博士": "博士研究生",
+            rep = {"本科": "本科生", "博士": "博士研究生",
                    "硕士": "硕士研究生"}[zh]
             spans.append((i, i + 5, rep))
             i += 5
@@ -264,6 +265,60 @@ def _adapt_part(xml_bytes: bytes, zh: str, en_cap: str, en_low: str) -> bytes:
     return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
 
 
+# ---------------------------------------------------------------------------
+# 引擎内置封面检测（cover_inject 失败守卫）
+# ---------------------------------------------------------------------------
+_ENGINE_TABLE_MARKERS = [
+    "硕士研究生：导",       # 中文表格封面特征行（旧版 profile）
+    "Candidate：Supervisor：",  # 英文表格封面特征行（旧版 profile）
+    "申请学位：",             # 引擎 frontmatter 表格字段
+    "Academic Degree Applied for：",
+]
+
+_ENGINE_PARA_MARKERS = [
+    "硕士研究生：【请填写】",   # 段落型封面占位符（当前 hit-master-thesis）
+    "【请填写】",
+    "【Please Fill】",
+]
+
+def _has_engine_builtin_cover(docx_path: str) -> bool:
+    """检测 document.xml 是否包含引擎内置的未替换封面。
+
+    引擎生成的封面有两种形式：
+      1. 段落型（当前 hit-master-thesis profile）：含「【请填写】」/「【Please Fill】」
+         占位符，如「硕士研究生：【请填写】」、「Candidate：【Please Fill】」。
+      2. 表格型（旧版 profile）：含「硕士研究生：导师」等未替換字段名的表格。
+
+    官方 封面.docx 注入后，这些占位符会被 replace_cover_titles 替换为实际论文
+    题目和作者信息。若检测到占位符仍存在，说明 cover_inject 未能成功执行。
+
+    返回 True 表示 cover_inject 很可能未成功，degree_adapt 不应在错误封面上改字。
+    """
+    try:
+        with zipfile.ZipFile(docx_path, "r") as zf:
+            data = zf.read("word/document.xml")
+    except (zipfile.BadZipFile, KeyError):
+        return False
+    root = etree.fromstring(data)
+
+    # 检测表格型旧版封面
+    for tbl in root.iter(w("tbl")):
+        text = "".join(tbl.itertext())
+        for marker in _ENGINE_TABLE_MARKERS:
+            if marker in text:
+                return True
+
+    # 检测段落型当前封面（检查前 40 个段落的文本）
+    paras = list(root.iter(w("p")))[:50]
+    for p in paras:
+        text = "".join(p.itertext())
+        for marker in _ENGINE_PARA_MARKERS:
+            if marker in text:
+                return True
+
+    return False
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="学位层次适配：硕士→本科/博士，master→bachelor/doctor（封面/页眉/页脚/后置小节标题）")
@@ -275,6 +330,17 @@ def main() -> int:
     if args.degree == "master":
         print("[degree-adapt] degree=master，无需适配，原样保留。")
         return 0
+
+    # ---- 守卫：检测引擎内置封面（cover_inject 失败）----
+    if _has_engine_builtin_cover(args.docx):
+        print("[degree-adapt] ❌ 错误：检测到文档中仍存在引擎内置的未替换封面！", file=sys.stderr)
+        print("  这说明 cover_inject.py（封面模板注入）未能成功替换掉引擎生成的错误封面。", file=sys.stderr)
+        print(f"  如果在错误的封面上执行 degree={args.degree} 文字替换，会产生乱码封面。", file=sys.stderr)
+        print("  请检查：", file=sys.stderr)
+        print("    1. input/封面.docx 是否存在且未损坏", file=sys.stderr)
+        print("    2. 上一步 [2/3] 是否显示「封面区注入: 成功」", file=sys.stderr)
+        print("    3. 是否使用了 generate.py（而非直接跑 md2docx 命令）", file=sys.stderr)
+        return 1
 
     zh, en_cap, en_low = ZH[args.degree], EN_CAP[args.degree], EN_LOW[args.degree]
 

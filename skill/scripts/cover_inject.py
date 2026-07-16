@@ -65,7 +65,7 @@ def _read_front_titles(front_path: str):
 
 def _extract_titles_from_doc(doc: Document):
     """从 docx 现有封面区（开头到第一个摘要）提取中/英文题目，作兜底。"""
-    cn = en_lines = None
+    cn = en = en_lines = None
     cn_cands, en_cands = [], []
     FIXED = ("硕士学位论文", "学术学位", "哈尔滨工业大学", "国内图书分类号",
              "国际图书分类号", "学校代码", "密级", "Classified", "U.D.C",
@@ -275,6 +275,28 @@ def inject_cover(target: Document, cover_elems):
         body.remove(c)
     for el in reversed(cover_elems):
         body.insert(0, el)
+
+    # ---- 安全网：清理残留的引擎内置前置封面表 ----
+    # 引擎可能在段落式封面之外还生成了表格型前置封面（含
+    # 「硕士研究生：」「Candidate：Supervisor：」等字段）。
+    # 这些表格位于注入的官方模板和正文摘要之间，需要额外清除。
+    # 策略：移除 body 下所有位于 摘要段落之前的表格（正文数据表只会在摘要之后）。
+    n_rm = 0
+    _abstract_seen = False
+    for child in list(body):
+        tag = etree.QName(child).localname
+        if tag == "p":
+            txt = "".join(child.itertext()).strip()
+            if "摘" in txt and "要" in txt and "Abstract" not in txt:
+                _abstract_seen = True
+        if _abstract_seen:
+            break
+        if tag == "tbl":
+            body.remove(child)
+            n_rm += 1
+    if n_rm:
+        print(f"   清理 {n_rm} 个残留引擎前置封面表")
+
     return True
 
 
