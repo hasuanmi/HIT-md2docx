@@ -48,6 +48,7 @@ def main():
     parser.add_argument("input_md", help="输入 Markdown 文件")
     parser.add_argument("output_docx", nargs="?", help="输出 .docx 文件（默认: <输入同名>.docx）")
     parser.add_argument("--profile", default="hit-master-thesis", help="引擎 profile（默认 hit-master-thesis）")
+    parser.add_argument("--front-matter", default=None, help="封面信息 front_matter md 文件路径（默认：input/front_matter_hit.md）")
     parser.add_argument("--no-cover", action="store_true", help="跳过官方封面模板注入")
     parser.add_argument("--no-fix", action="store_true", help="跳过字体规范修复 (fix_docx)")
     parser.add_argument("--degree", default="master",
@@ -103,7 +104,8 @@ def main():
                                  dir=os.path.dirname(os.path.abspath(input_md)) or ".")
         print(f"[0.5/3] Markdown 预处理: {os.path.basename(input_md)} -> "
               f"{os.path.basename(pre_md)}")
-        r0 = subprocess.run([py, md_script, input_md, "-o", pre_md],
+        r0 = subprocess.run([py, md_script, input_md, "-o", pre_md]
+                            + (["--front-matter", args.front_matter] if args.front_matter else []),
                             cwd=ENGINE_ROOT, env=child_env)
         if r0.returncode != 0:
             print(f"预处理失败 (exit {r0.returncode})", file=sys.stderr)
@@ -155,6 +157,8 @@ def main():
             "--cover-template", cover_template,
             "--out", temp_docx,
         ]
+        if args.front_matter:
+            cmd2 += ["--front-matter", args.front_matter]
         r2 = subprocess.run(cmd2, cwd=ENGINE_ROOT,
                             capture_output=True, text=True,
                             encoding="utf-8", errors="replace", env=child_env)

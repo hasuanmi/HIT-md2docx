@@ -119,21 +119,27 @@ def find_spans(logical: str, zh: str, en_cap: str, en_low: str):
 
 
 def reflow_block(runs, spans, logical: str) -> None:
-    """把替换结果写回各 w:t 跑，保留未被替换部分的原有字形。
+    """把替换结果写回各 <w:t> 跑，保留未被替换部分的原有字形。
 
-    runs: 该块内所有 <w:t> 元素（按文档顺序）。spans 来自 find_spans。
+    原实现同时递增 logical 位置 p 和 run 内位置 k，在 replacement 长度与被替换
+    长度不一致（例如"硕士研究生"→"本科生"）时会导致 p 与后续 run 错位，出现
+    "本科生士研究生"等残留。新版按"每个 run 负责输出其原始 logical 区间对应的
+    字符"重新分配，遇到 span 起点时把完整 rep 写入该 run，并跳过 span 其余位置。
     """
     if not spans:
         return
     n = len(logical)
-    consumed = [False] * n
-    span_start = {}
-    for (s, e, rep) in spans:
-        for p in range(s, e):
-            consumed[p] = True
-        span_start[s] = (e, rep)
+    sorted_spans = sorted(spans, key=lambda x: x[0])
 
-    # 每块跑的起始逻辑位置
+    # 标记被替换位置，并记录每个 span 起点对应的替换文本
+    replaced = [False] * n
+    replacements = {}
+    for s, e, rep in sorted_spans:
+        for p in range(s, e):
+            replaced[p] = True
+        replacements[s] = rep
+
+    # 每个 run 在原始 logical 字符串中的起止位置
     run_start = []
     pos = 0
     for r in runs:
@@ -144,24 +150,20 @@ def reflow_block(runs, spans, logical: str) -> None:
     p = 0
     for j, r in enumerate(runs):
         t = r.text or ""
-        k = 0
-        while k < len(t) and p < n:
-            # 先处理替换起点：把 adapted token 写入本跑（覆盖逻辑位置 s..e-1）
-            if p in span_start:
-                e, rep = span_start[p]
-                out[j].extend(list(rep))
-                while p < e:
-                    p += 1
-                    k += 1
-                continue
-            # 其余被替换 token 占用的位置（token 内部、非起点）直接跳过
-            if consumed[p]:
+        start = run_start[j]
+        end = start + len(t)
+        # 如果前面因 span 替换产生跳跃，p 可能已超过当前 run 起点，直接跳过
+        if p < start:
+            p = start
+        while p < end and p < n:
+            if p in replacements:
+                out[j].extend(list(replacements[p]))
+                # 跳过整个 span 覆盖的原始位置
+                p = next((e for s, e, _ in sorted_spans if s == p), p + 1)
+            else:
+                out[j].append(logical[p])
                 p += 1
-                k += 1
-                continue
-            out[j].append(t[k])
-            p += 1
-            k += 1
+
     for j, r in enumerate(runs):
         r.text = "".join(out[j])
 

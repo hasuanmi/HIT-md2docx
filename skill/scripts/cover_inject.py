@@ -33,6 +33,8 @@ import sys
 
 sys.stdout.reconfigure(encoding="utf-8")
 
+import math
+
 from docx import Document
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
@@ -106,39 +108,30 @@ def extract_titles(front_path, doc, cli_cn=None, cli_en=None):
 
 
 # ---------------------------------------------------------------------------
-# 题目替换（保留白色批注）
+# 题目替换
 # ---------------------------------------------------------------------------
 def _replace_title_text(para, new_text):
+    """替换段落文本，并清空其余 run，避免模板残留的格式说明/乱码符号被保留。
+
+    只改文本，绝不改字号/字体/间距（题目字号须严格保持模板规范：2号字）。
+    """
     runs = para.runs
-    black = []
-    for i, r in enumerate(runs):
-        rPr = r._r.find(Q("rPr"))
-        color = None
-        if rPr is not None:
-            c = rPr.find(Q("color"))
-            if c is not None:
-                color = c.get(Q("val"))
-        if color and color.upper() == "FFFFFF":
-            continue
-        black.append(i)
-    if not black:
+    if not runs:
         return False
-    runs[black[0]].text = new_text
-    for i in black[1:]:
-        runs[i].text = ""
+    runs[0].text = new_text
+    for r in runs[1:]:
+        r.text = ""
     return True
 
 
 def _split_en(en, maxc=56):
-    """把英文题目断成恰好 2 行（第二行含剩余所有词，绝不丢字）。
+    """把英文题目按模板两行结构拆分。
 
-    优先在复合词 'Industrial Technology' 后断开（本论文题目前半段结构）；
-    否则贪心到 maxc，剩余全部放入第二行。模板备注：题目过长可用小 2 号字。
+    如果整题能在 56 字符以内放下，则只放第一行，第二行留空；
+    否则优先在第一行结束时断开，剩余全部放入第二行。
     """
-    marker = "Industrial Technology"
-    if marker in en:
-        i = en.index(marker) + len(marker)
-        return en[:i].strip(), en[i:].strip()
+    if len(en) <= maxc:
+        return en, ""
     words = en.split()
     if len(words) <= 1:
         return en, ""
@@ -158,12 +151,32 @@ _COVER_FIXED_LABELS = (
     "Candidate", "Supervisor", "Academic Degree Applied for", "Speciality",
     "Affiliation", "Date of Defence", "Degree-Conferring", "授予学位单位",
     "所在单位", "申请学位", "导师", "答辩日期", "Harbin Institute of Technology",
-    "（Times New Roman",
+    "（Times New Roman", "Times New Roman", "2号", "小2号", "加粗", "居中",
+    "年 月", "年月", "答辩日期",
 )
 
 
 def _is_cover_label(t: str) -> bool:
     return any(k in t for k in _COVER_FIXED_LABELS)
+
+
+def _para_is_bold_title_style(p) -> bool:
+    """判断段落是否符合封面题目（中文/英文）的格式特征：至少有一个非白色 run 加粗，
+    且字号 >= 18pt（小二号）= 342000 EMU。"""
+    for r in p.runs:
+        if not r.text:
+            continue
+        # 跳过白色批注 run
+        rPr = r._r.find(Q("rPr"))
+        if rPr is not None:
+            c = rPr.find(Q("color"))
+            if c is not None and c.get(Q("val"), "").upper() == "FFFFFF":
+                continue
+        if r.bold:
+            sz = r.font.size
+            if sz is not None and sz >= 342000:  # 18pt
+                return True
+    return False
 
 
 def _cjk_len(t: str) -> int:
@@ -174,20 +187,146 @@ def _en_len(t: str) -> int:
     return sum(1 for c in t if c.isascii() and c.isalpha())
 
 
-def replace_cover_titles(cover: Document, cn, en):
-    """把模板封面的中/英文题目替换为论文题目（对任意论文生效，不再写死示例题目）。
+# ---------------------------------------------------------------------------
+# 封面第一页排版守恒：题目变长后压缩空行，保证"哈尔滨工业大学 / 年 月"留在第一页底部
+#
+# 思路（不改字号，严格保持模板 2 号题字规范）：
+#   模板用一串空行把校名/年月块顶到第一页底部。题目越长、换行越多，就把校名块
+#   往下挤到第二页。因此按"题目相对模板原题多出的视觉行数"，等比例删掉题目区与
+#   校名块之间的空行即可把校名块拉回第一页底部。
+#   - 题目行(2号=22pt) 行高 ≈ 27.5pt；空行(正文五号=10.5pt) 行高 ≈ 12.6pt。
+#   - 每多 1 行题目 ≈ 需删 27.5/12.6 ≈ 2.2 个空行来补偿。
+# ---------------------------------------------------------------------------
+_TITLE_LINE_PT = 27.5      # 2号题目单行高度(近似)
+_EMPTY_LINE_PT = 12.6      # 五号空行单行高度(近似)
+_TITLE_FONT_PT = 22.0      # 2号
+_EN_CHAR_W_RATIO = 0.5     # 英文字符平均宽 ≈ 0.5×字号
 
-    定位策略（基于「题目 = 封面中最长的非标签文本段落」这一不变式）：
-      - 中文题目：替换所有「中文长度 >= 8 且非固定标签、非格式提示」的段落
-        （中/英文封面各一处题目都会命中）；
-      - 英文题目：替换所有「纯英文且长度 >= 20 且非固定标签」的段落，并把其后续
-        英文续行清空或填入按模板断行规则得到的第二行。
-    题目段落可能出现在中文封面与英文封面两处，故用循环而非「取最长一处」。
+
+def _cover_usable_width_pt(cover: Document) -> float:
+    """封面页面可用文字宽度(pt) = 页宽 - 左右页边距。"""
+    body = cover.element.body
+    for sect in body.iter(Q("sectPr")):
+        pgSz = sect.find(Q("pgSz"))
+        pgMar = sect.find(Q("pgMar"))
+        if pgSz is not None and pgMar is not None:
+            try:
+                w = int(pgSz.get(Q("w")))
+                l = int(pgMar.get(Q("left")))
+                r = int(pgMar.get(Q("right")))
+                return (w - l - r) / 20.0  # twips -> pt
+            except (TypeError, ValueError):
+                pass
+    return 425.0  # A4 默认(11906-1701-1701)/20
+
+
+def _text_width_units(t: str) -> float:
+    """估算文本"全角宽度单位"：中日韩/全角标点=1.0，其余(含 ASCII)=0.5。"""
+    u = 0.0
+    fullwidth_punct = "《》【】「」『』（）—…·、，。；：！？"
+    for c in t:
+        if ("\u4e00" <= c <= "\u9fff") or ("\u3000" <= c <= "\u303f") \
+                or ("\uff00" <= c <= "\uffef") or c in fullwidth_punct:
+            u += 1.0
+        else:
+            u += 0.5
+    return u
+
+
+def _cjk_title_lines(text: str, usable_pt: float) -> int:
+    """中文题目在封面题目区的视觉行数。"""
+    if not text:
+        return 0
+    units = _text_width_units(text)
+    per_line = max(1.0, usable_pt / _TITLE_FONT_PT)
+    return max(1, math.ceil(units / per_line))
+
+
+def _en_title_lines(text: str, usable_pt: float) -> int:
+    """英文题目在封面题目区的视觉行数。"""
+    n = len((text or "").strip())
+    if not n:
+        return 0
+    per_line = max(1.0, usable_pt / (_TITLE_FONT_PT * _EN_CHAR_W_RATIO))
+    return max(1, math.ceil(n / per_line))
+
+
+def compress_cover_gap(cover: Document, remove_n: int, keep_min: int = 3) -> int:
+    """删除"哈尔滨工业大学"上方紧邻的若干空行，把校名/年月块拉回第一页底部。
+
+    只删除紧邻校名块上方的连续空段落（题目区与校名块之间的排版留白），
+    保留至少 keep_min 个空行以维持底部间距；从最靠近校名块的一侧开始删。
+    """
+    if remove_n <= 0:
+        return 0
+    paras = cover.paragraphs
+    anchor = None
+    for i, p in enumerate(paras):
+        if "哈尔滨工业大学" in p.text:
+            anchor = i
+            break
+    if anchor is None:
+        return 0
+    empties = []
+    j = anchor - 1
+    while j >= 0 and paras[j].text.strip() == "":
+        empties.append(paras[j])
+        j -= 1
+    removable = max(0, len(empties) - keep_min)
+    to_remove = min(remove_n, removable)
+    removed = 0
+    for k in range(to_remove):
+        el = empties[k]._p
+        el.getparent().remove(el)
+        removed += 1
+    return removed
+
+
+def replace_cover_titles(cover: Document, cn, en):
+    """把模板封面的中/英文题目替换为论文题目。
+
+    定位策略基于「题目 = 封面中长度达标的非固定标签文本段落」：
+      - 中文题目：替换所有 CJK 长度 >= 8、非固定标签、非格式说明的段落；
+      - 英文题目：替换所有纯英文长度 >= 20、非固定标签、非格式说明的段落，
+        并把其后续连续英文续行清空或填入第二行。
+    模板底部的格式说明（如「年 月、Times New Roman...」）已被 _COVER_FIXED_LABELS
+    排除，避免被误替换。
     """
     if not cn and not en:
         return 0
     paras = cover.paragraphs
     n = 0
+
+    # —— 替换前先记录模板原题目，用于估算题目变长后多出的视觉行数 ——
+    usable_pt = _cover_usable_width_pt(cover)
+    orig_cn = None
+    for p in paras:
+        t = p.text.strip()
+        if not t or _is_cover_label(t) or t.lstrip().startswith("（"):
+            continue
+        if _cjk_len(t) >= 8:
+            orig_cn = t
+            break
+    orig_en_parts = []
+    for i0 in range(len(paras)):
+        t = paras[i0].text.strip()
+        if t and not _is_cover_label(t) and _en_len(t) >= 20 and _cjk_len(t) == 0:
+            orig_en_parts.append(t)
+            k = i0 + 1
+            while k < len(paras):
+                tt = paras[k].text.strip()
+                if not tt:
+                    k += 1
+                    continue
+                if _is_cover_label(tt):
+                    break
+                if _en_len(tt) > 0 and _cjk_len(tt) == 0:
+                    orig_en_parts.append(tt)
+                    k += 1
+                    continue
+                break
+            break
+    orig_en = " ".join(orig_en_parts)
 
     if cn:
         for p in paras:
@@ -200,14 +339,18 @@ def replace_cover_titles(cover: Document, cn, en):
 
     if en:
         en1, en2 = _split_en(en)
-        for i, p in enumerate(paras):
+        i = 0
+        while i < len(paras):
+            p = paras[i]
             t = p.text.strip()
             if not t or _is_cover_label(t):
+                i += 1
                 continue
             if _en_len(t) >= 20 and _cjk_len(t) == 0:
+                # 命中英文标题第一行
                 if _replace_title_text(p, en1):
                     n += 1
-                # 续行：清空或填入第二行，直到遇到下一个固定标签
+                # 处理续行：下一个连续英文段落作为第二行
                 j = i + 1
                 second_filled = False
                 while j < len(paras):
@@ -217,15 +360,31 @@ def replace_cover_titles(cover: Document, cn, en):
                         continue
                     if _is_cover_label(tt):
                         break
-                    if _cjk_len(tt) == 0 and _en_len(tt) > 0:
+                    if _en_len(tt) > 0 and _cjk_len(tt) == 0:
                         if en2 and not second_filled:
-                            _replace_title_text(paras[j], en2)
+                            if _replace_title_text(paras[j], en2):
+                                n += 1
                             second_filled = True
-                            n += 1
                         else:
                             for r in paras[j].runs:
                                 r.text = ""
-                    j += 1
+                        j += 1
+                        continue
+                    # 遇到非英文格式说明行，停止清空
+                    break
+                i = j
+            else:
+                i += 1
+
+    # —— 题目变长 → 等比例压缩校名块上方空行，把"哈尔滨工业大学 / 年 月"拉回第一页底部 ——
+    base_lines = _cjk_title_lines(orig_cn or "", usable_pt) + _en_title_lines(orig_en, usable_pt)
+    new_lines = _cjk_title_lines(cn or orig_cn or "", usable_pt) + _en_title_lines(en or orig_en, usable_pt)
+    extra_lines = new_lines - base_lines
+    if extra_lines > 0:
+        remove_n = round(extra_lines * (_TITLE_LINE_PT / _EMPTY_LINE_PT))
+        removed = compress_cover_gap(cover, remove_n)
+        print(f"   题目多出 {extra_lines} 行 → 压缩封面空行 {removed} 个（保校名块于首页底部）")
+
     return n
 
 
@@ -233,25 +392,46 @@ def replace_cover_titles(cover: Document, cn, en):
 # 封面区元素构建 & 注入
 # ---------------------------------------------------------------------------
 def build_cover_elems(cover: Document):
+    """返回封面模板 body 下所有子元素的深拷贝，并保留其原始分节结构。
+
+    封面模板 ``input/封面.docx`` 的 body 末尾会带一个 ``w:sectPr``（body sectPr）。
+    在目标文档中，这个 sectPr 若作为 body 子元素直接插入到封面与正文之间，会
+    破坏分节逻辑，导致英文封面与摘要之间的空白页丢失或分节错位。
+
+    这里把它从 body 子元素中取出，作为 inline sectPr 挂到封面区最后一个段落
+    （即空白页段落）的 pPr 上：
+      - 封面区最后一个 inline sectPr（模板中已有的英文封面节结束）会先产生新页，
+        进入空白页；
+      - 移到这个末段的 body sectPr 再产生新页，使摘要从新页开始；
+      - 这样英文封面与摘要之间自然夹着一页空白页。
+    """
     cover_body = cover.element.body
     children = list(cover_body)
-    if etree.QName(children[-1]).localname == "sectPr":
-        body_sect = children[-1]
-        last_para = None
-        for child in reversed(children[:-1]):
-            if etree.QName(child).localname == "p" and "".join(child.itertext()).strip():
-                last_para = child
-                break
-        if last_para is not None:
-            pPr = last_para.find(Q("pPr"))
-            if pPr is None:
-                pPr = OxmlElement("w:pPr")
-                last_para.insert(0, pPr)
-            if pPr.find(Q("sectPr")) is None:
-                pPr.append(copy.deepcopy(body_sect))
-        cover_body.remove(body_sect)
-        children = list(cover_body)
-    return [copy.deepcopy(c) for c in children]
+    elems = [copy.deepcopy(c) for c in children]
+
+    # 把模板末尾的 body sectPr 取下来，准备挂到封面区最后一个段落
+    last_sectPr = None
+    if elems and etree.QName(elems[-1]).localname == "sectPr":
+        last_sectPr = elems.pop()
+
+    # 确保封面区最后一个元素是段落（模板正常是末尾的空白页段落）
+    if not elems or etree.QName(elems[-1]).localname != "p":
+        blank = OxmlElement("w:p")
+        elems.append(blank)
+    last_p = elems[-1]
+
+    if last_sectPr is not None:
+        pPr = last_p.find("{%s}pPr" % W)
+        if pPr is None:
+            pPr = OxmlElement("w:pPr")
+            last_p.insert(0, pPr)
+        # 避免和已有 sectPr 冲突：先移除已有的 inline sectPr
+        old = pPr.find("{%s}sectPr" % W)
+        if old is not None:
+            pPr.remove(old)
+        pPr.append(last_sectPr)
+
+    return elems
 
 
 def inject_cover(target: Document, cover_elems):
