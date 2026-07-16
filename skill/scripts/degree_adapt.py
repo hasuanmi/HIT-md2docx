@@ -303,14 +303,12 @@ def _has_engine_builtin_cover(docx_path: str) -> bool:
         return False
     root = etree.fromstring(data)
 
-    # 检测表格型旧版封面
-    for tbl in root.iter(w("tbl")):
-        text = "".join(tbl.itertext())
-        for marker in _ENGINE_TABLE_MARKERS:
-            if marker in text:
-                return True
+    # 注意：官方封面模板的表格本身含「硕士研究生：导」「Candidate：Supervisor：」
+    # 等字样，这些并非失败信号；唯一可靠的 cover_inject 失败信号是引擎生成的
+    # 未填占位符「【请填写】/【Please Fill】」，因此只对段落占位符做检测，
+    # 避免把正确的官方模板表格误判为「引擎内置封面」而阻断层次适配。
 
-    # 检测段落型当前封面（检查前 40 个段落的文本）
+    # 检测段落型当前封面（检查前 40 个段落的文本）—— 仅以未填占位符为信号
     paras = list(root.iter(w("p")))[:50]
     for p in paras:
         text = "".join(p.itertext())
