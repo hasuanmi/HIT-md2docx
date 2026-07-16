@@ -72,9 +72,12 @@ DECL_START_MARKERS = [
     "版权使用授权书",
 ]
 
-# 机构名保护：声明区「研究生」→「本科生」时，绝不能把「深圳研究生院」等
-# 机构名误改成「深圳本科生院」。
+# 机构名保护：声明区「研究生」改写时，绝不能把「深圳研究生院」等
+# 机构名误改（本科→深圳本科生院 / 博士→深圳博士生院）。
 INSTITUTION_PROTECT = "研究生院"
+
+# 声明区通用「研究生」按目标学位改写（不能写死为「本科生」，否则博士论文会被误改）
+DECL_GRAD_MAP = {"本科": "本科生", "博士": "博士生", "硕士": "研究生"}
 
 
 def w(tag: str) -> str:
@@ -197,18 +200,19 @@ def _is_decl_start(p_elem) -> bool:
     return any(m in t for m in DECL_START_MARKERS)
 
 
-def _decl_replace(text: str) -> str:
-    """声明区「研究生」→「本科生」，保护机构名「研究生院」。"""
+def _decl_replace(text: str, target: str) -> str:
+    """声明区「研究生」→ 目标学位对应词（本科→本科生 / 博士→博士生），保护机构名「研究生院」。"""
+    rep = DECL_GRAD_MAP[target]
     return (text.replace(INSTITUTION_PROTECT, "\x00")
-                .replace("研究生", "本科生")
+                .replace("研究生", rep)
                 .replace("\x00", INSTITUTION_PROTECT))
 
 
-def adapt_declaration_block(elem) -> None:
-    """声明区逐跑替换「研究生」→「本科生」，保护机构名。"""
+def adapt_declaration_block(elem, target: str) -> None:
+    """声明区逐跑替换「研究生」→ 目标学位对应词，保护机构名。"""
     for r in block_runs(elem):
         if r.text and "研究生" in r.text:
-            r.text = _decl_replace(r.text)
+            r.text = _decl_replace(r.text, target)
 
 
 def _is_stop(p_elem) -> bool:
@@ -243,8 +247,8 @@ def _adapt_document(xml_bytes: bytes, zh: str, en_cap: str, en_low: str) -> byte
                 # 封面信息表等落在 摘要 之后，仍要改写学位字样
                 adapt_block(child, zh, en_cap, en_low)
             elif in_declaration:
-                # 声明区「研究生」→「本科生」，保护机构名「研究生院」
-                adapt_declaration_block(child)
+                # 声明区「研究生」→ 目标学位对应词（本科→本科生 / 博士→博士生），保护机构名「研究生院」
+                adapt_declaration_block(child, zh)
         elif tag == "tbl":
             if in_cover:
                 adapt_block(child, zh, en_cap, en_low)
