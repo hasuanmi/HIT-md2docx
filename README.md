@@ -65,10 +65,6 @@ npm install --prefix thesis_md2docx/math/latex2omml_node
 
 ### 2. 生成 Word（⚠ 必须用 generate.py）
 
-> **不要直接跑 `md2docx docx` 或 `python -m thesis_md2docx.main docx`！**
-> 那只会生成基础封面（近似版式），且不会注入哈工大官方封面模板。
-> **必须使用下面的一条龙脚本**，它会自动完成：引擎生成 → 注入官方封面模板 → 学位层次适配。
-
 ```bash
 # 硕士论文（默认）——生成带官方封面的完整 docx
 python generate.py 你的论文.md 输出.docx
@@ -113,13 +109,6 @@ md2docx all --profile hit-master-thesis 你的论文.md 论文.docx 论文.pdf -
 ---
 
 ## 常见问题
-
-- **⚠ 封面显示「本科学位论文」/「学士学位」/ 版式不对？** 根因几乎都是**本机旧版引擎被优先加载（"引擎 shadow"）**——仓库里根本没有这几个字，旧引擎才会生成它们。排查：
-  1. **命令要对** —— 必须用 `python generate.py 论文.md 输出.docx`（第 2 步），不要直接跑 `md2docx docx` / `python -m thesis_md2docx.main`。
-  2. **仓库要对** —— 确认是 `https://github.com/484899614-shipi-it/HIT-md2docx.git`（或它的 fork），不是其他旧仓库。
-  3. **清掉旧安装 shadow** —— 在新 clone 的目录里重新 `pip install -e .`，让 `thesis_md2docx` 指向**当前仓库**；若本机别处还有旧版（如早期 `HITmd2docx`/`Thesis-md2docx` 的可编辑安装），在仓库目录下它会优先于那个旧版被导入。
-  4. **本仓库 `generate.py` 已自动规避**：第 1 步强制走 `skill/scripts/run_engine.py`（用 `sys.path.insert(0, 仓库)` 把当前引擎顶到最前），即便有旧安装也不会被误用。
-  正确的封面应显示 **「硕士学位论文」**（硕士）/ **「Dissertation for the Master Degree」**（英文），且版式与学校下发的 Word 模板一致。
 
 - **英文目录没出现 / 是中文？** 确认 `heading_translations.json` 和你的 md 在**同一目录**。
 - **公式显示为 LaTeX 原文而非公式？** 需要 Node.js 环境（引擎用 `math/latex2omml_node` 转 OMML）；缺失时保留原文，不影响其余排版。
