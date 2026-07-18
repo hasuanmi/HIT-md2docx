@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -54,7 +55,13 @@ from ...ooxml.parts import native_sect_pr_xml
 from ...ooxml.xml import spacing_xml
 from ...ooxml.xml import indent_xml
 from ...styles import StyleRole
-from ...toc import TocEntry, make_toc_entry
+from ...toc import TocEntry, make_toc_entry, split_bilingual, strip_bilingual
+from ...translation import (
+    load_llm_cache,
+    load_llm_config,
+    save_llm_cache,
+    translate_headings,
+)
 from ..base import ThesisProfile
 
 A4_WIDTH_TWIPS = 11907
@@ -695,7 +702,7 @@ def _format_toc_chinese_number(entry: TocEntry) -> TocEntry:
     if not m:
         return entry
     num_parts = m.group(1).split(".")
-    label = m.group(2).strip()
+    label = strip_bilingual(m.group(2).strip())
     try:
         if entry.level == 1:
             prefix = f"第{chinese_cardinal(int(num_parts[0]))}章 "
@@ -718,15 +725,18 @@ def _format_toc_english_number(
     translations: dict[str, str] | None = None,
 ) -> TocEntry:
     """英文目录（Contents）：一级标题加粗并显示为 Chapter One，二级/三级
-    保留中文编号（一、/（一）），标题文字按 heading_translations.json 翻译成英文；
-    未命中时回退中文。复用与中文目录相同的 _Toc 书签，页码完全一致。"""
+    保留中文编号（一、/（一）），标题文字按 priority 解析：
+      1) 标题里的行内英文 `中文 | English`；
+      2) translations（heading_translations.json 用户映射 + LLM 缓存合并）；
+      3) 都没有则回退中文原文。
+    复用与中文目录相同的 _Toc 书签，页码完全一致。"""
     translations = translations or {}
     m = _TOC_NUM_RE.match(entry.text)
     if not m:
         # 无编号的条目标题（如“参考文献”“致谢”“附录”）直接按映射翻译并加粗
-        label = entry.text.strip()
-        english_label = translations.get(label, label)
-        if english_label == label:
+        _cn, en = split_bilingual(entry.text.strip())
+        english_label = en or translations.get(entry.text.strip(), entry.text.strip())
+        if english_label == entry.text.strip() and not en:
             return entry
         return TocEntry(
             level=entry.level,
@@ -735,8 +745,9 @@ def _format_toc_english_number(
             bookmark_id=entry.bookmark_id,
         )
     num = m.group(1).strip()  # 例如 "1" / "1.1" / "1.1.1"
-    label = m.group(2).strip()
-    english_label = translations.get(label, label)
+    _cn, en = split_bilingual(m.group(2).strip())
+    label = strip_bilingual(m.group(2).strip())
+    english_label = en or translations.get(label, label)
     try:
         parts = num.split(".")
         if entry.level == 1:
@@ -870,12 +881,37 @@ def build_document(
         abstract_en_entry,
         *[_format_toc_chinese_number(e) for e in toc_entries_raw],
     ]
-    # 英文目录（Contents）：复用同一批书签，编号转为英文样式，标题按 JSON 翻译
+    # 英文目录（Contents）：复用同一批书签，编号转为英文样式，标题按
+    # heading_translations.json（用户映射）+ LLM 缓存（按 priority 合并）翻译；
+    # 标题里的行内 `中文 | English` 优先级最高，未命中则回退中文。
     heading_translations = _load_heading_translations(markdown_dir)
+    llm_cache = load_llm_cache(markdown_dir)
+    # 合并字典：用户映射覆盖 LLM 缓存
+    _combined = {**llm_cache, **heading_translations}
+    # 收集既无行内英文、又不在合并字典里的缺失标题，按需批量调 LLM 翻译并缓存
+    _missing = set()
+    for _e in toc_entries_raw:
+        _m = _TOC_NUM_RE.match(_e.text)
+        _raw_label = (_m.group(2) if _m else _e.text).strip()
+        _cn, _en = split_bilingual(_raw_label)
+        if _en or _raw_label in _combined:
+            continue
+        _missing.add(_raw_label)
+    if _missing and not os.environ.get("HITMD2DOCX_NO_LLM"):
+        _cfg = load_llm_config(markdown_dir)
+        if _cfg:
+            try:
+                _translated = translate_headings(sorted(_missing), config=_cfg)
+            except Exception:
+                _translated = {}
+            if _translated:
+                llm_cache.update(_translated)
+                save_llm_cache(markdown_dir, llm_cache)
+                _combined = {**llm_cache, **heading_translations}
     toc_entries_en = [
         TocEntry(level=1, text="**Abstract(In Chinese)**", anchor=abstract_cn_entry.anchor, bookmark_id=abstract_cn_entry.bookmark_id),
         TocEntry(level=1, text="**Abstract(In English)**", anchor=abstract_en_entry.anchor, bookmark_id=abstract_en_entry.bookmark_id),
-        *[_format_toc_english_number(e, heading_translations) for e in toc_entries_raw],
+        *[_format_toc_english_number(e, _combined) for e in toc_entries_raw],
     ]
 
     # 后置部分（参考文献之后）：攻读硕士学位期间取得的科研成果 →
@@ -896,7 +932,7 @@ def build_document(
         _raw = make_toc_entry(len(toc_entries) + len(post_ref_entries) + 1, level=1, text=_title)
         post_ref_entries.append(_raw)
         toc_entries.append(_format_toc_chinese_number(_raw))
-        toc_entries_en.append(_format_toc_english_number(_raw, heading_translations))
+        toc_entries_en.append(_format_toc_english_number(_raw, _combined))
 
     elements: list[str] = []
     taskbook_added = False

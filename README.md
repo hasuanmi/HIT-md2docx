@@ -30,7 +30,7 @@ HIT-md2docx/
 │   ├── scripts/             # md_to_fordocx.py / cover_inject.py / degree_adapt.py / audit_docx.py / fix_docx.py / run_engine.*
 │   ├── references/          # 哈工大格式规范、自查清单、范例 MD
 │   └── agents/openai.yaml
-├── input/                   # 资源：封面.docx（官方封面模板）+ heading_translations.json（中英文目录映射）
+├── input/                   # 资源：封面.docx（官方封面模板）+ heading_translations.json（中英文目录映射，可选）
 ├── example/                 # 自包含样例
 │   ├── thesis-demo-hit.md                               # 最小可跑 demo（含图片、翻译表）
 │   ├── 论文_平台反垄断与研发投入.md                       # 真实范文：md 源（引擎可直接消费）
@@ -110,7 +110,12 @@ md2docx all --profile hit-master-thesis 你的论文.md 论文.docx 论文.pdf -
 
 ## 常见问题
 
-- **英文目录没出现 / 是中文？** 确认 `heading_translations.json` 和你的 md 在**同一目录**。
+- **英文目录没出现 / 是中文？** 不同人的论文标题各不相同，工具**不靠写死字典**，按以下优先级解析，对任意论文都能通用：
+  1. **行内双语标题（推荐，离线零依赖）**：在 Markdown 标题后用 ` | ` 或 ` :: ` 附上英文，例如 `## 1.1 研究背景 | Research Background`。正文、中文目录、页眉会自动剥掉英文，仅英文目录使用英文部分。
+  2. **`heading_translations.json`（用户映射，最高优先级覆盖）**：放在 md **同一目录**，键为「中文标题」、值为「英文」，可手动校对/补全。
+  3. **agent 预翻译（零外部 API，推荐给他人用）**：经 WorkBuddy / Comate 的 agent 流程跑时，agent 会**用自己的 LLM** 先把标题翻好、写进 `<md同目录>/heading_translations.json`，脚本完全不调外部接口，因此**无需任何 API key、离线、免费**。触发方式：`python generate.py <论文>.md --dump-headings` 导出待翻译标题 → agent 翻译 → 合并写回字典 → `python generate.py <论文>.md --no-llm` 生成。
+  4. **LLM 自动翻译兜底（裸脚本可选增强）**：直接裸跑脚本（不经 agent）且想全自动时，在 md 同目录或 cwd 的 `.env` 里配置 `HITMD2DOCX_LLM_API_KEY` / `HITMD2DOCX_LLM_BASE_URL`（OpenAI 兼容，默认 `https://api.openai.com/v1`，可用 DeepSeek/通义等）/ `HITMD2DOCX_LLM_MODEL`，引擎会一次性批量翻译所有缺失标题并缓存到 `heading_translations.llm.json`（可人工校对）。未配置 key 时跳过、自动回退中文、绝不报错中断。
+  5. 以上都没命中才回退中文原文。
 - **公式显示为 LaTeX 原文而非公式？** 需要 Node.js 环境（引擎用 `math/latex2omml_node` 转 OMML）；缺失时保留原文，不影响其余排版。
 - **章节序号错乱？** 检查一级标题是否写成 `# 数字 标题`；中文数字章号请先跑 `md_to_fordocx.py`。
 

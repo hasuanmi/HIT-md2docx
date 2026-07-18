@@ -40,7 +40,7 @@ from ..ooxml.xml import indent_xml, spacing_xml
 from ..parser import parse_body_blocks
 from ..styles import BodyRenderProfile
 from ..table_utils import parse_bool_option, parse_int_option, parse_table_split_spec, split_table_rows
-from ..toc import TocEntry, make_toc_entry
+from ..toc import TocEntry, make_toc_entry, strip_bilingual
 
 
 _CN_DIGITS = "零一二三四五六七八九"
@@ -747,7 +747,7 @@ def build_document_blocks(
                             text=rules.display_heading_text(heading_text),
                         )
                     appendix_heading = heading_builder(
-                        rules.display_heading_text(heading_text),
+                        strip_bilingual(rules.display_heading_text(heading_text)),
                         level,
                         profile,
                         numbered=False,
@@ -767,7 +767,7 @@ def build_document_blocks(
                 in_appendix = True
 
             if len(elements) == 0 and treat_first_heading_as_title:
-                elements.append(paragraph_xml(heading_text, style=profile.styles.title, align="center"))
+                elements.append(paragraph_xml(strip_bilingual(heading_text), style=profile.styles.title, align="center"))
                 continue
 
             toc_entry: TocEntry | None = None
@@ -784,7 +784,7 @@ def build_document_blocks(
                 if rules.is_toc_heading(heading_text, in_appendix=in_appendix, level=1):
                     toc_entry = make_toc_entry(len(toc_entries) + 1, level=1, text=normalized_heading)
                 appendix_heading = heading_builder(
-                    normalized_heading,
+                    strip_bilingual(normalized_heading),
                     1,
                     profile,
                     numbered=False,
@@ -819,9 +819,9 @@ def build_document_blocks(
                         this_chapter_title_rid = f"rId{TITLE_HEADER_RID_BASE + next_level1_header_index}"
                         if is_numbered_chapter:
                             chapter_label = f"第{chinese_cardinal(next_level1_header_index)}章"
-                            chapter_full = f"{chapter_label} {strip_heading_prefix(heading_text)}"
+                            chapter_full = f"{chapter_label} {strip_bilingual(strip_heading_prefix(heading_text))}"
                         else:
-                            chapter_full = strip_heading_prefix(heading_text)
+                            chapter_full = strip_bilingual(strip_heading_prefix(heading_text))
                         chapter_title_headers.append((this_chapter_title_rid, chapter_full))
                         next_level1_header_index += 1
                     append_chapter_page_break(new_section_title_header_rid=this_chapter_title_rid)
@@ -829,7 +829,7 @@ def build_document_blocks(
                     append_heading_page_break_without_section()
 
             is_unnumbered = rules.is_unnumbered_heading(heading_text, in_appendix=in_appendix, level=level)
-            display_heading_text = rules.display_heading_text(heading_text)
+            display_heading_text = strip_bilingual(rules.display_heading_text(heading_text))
 
             caption_style_id = profile.styles.caption or ""
             previous_is_caption = bool(
