@@ -356,6 +356,72 @@ def sort_references_by_citation(text: str) -> tuple[str, int]:
 
 
 # ---------------------------------------------------------------------------
+# 直引号 → 中文引号（中文论文排版规范）
+# ---------------------------------------------------------------------------
+def normalize_quotes(text: str) -> tuple[str, int]:
+    """把正文 ASCII 直引号 "（U+0022）配对替换为中文引号 “ ”（U+201C/U+201D）。
+
+    中文论文正文须用中文引号；源稿常因输入法/编辑器原因使用半角直引号。
+    本函数在 md 预处理层统一规范化（零引擎改动）。
+
+    保护范围（内部引号保持原样、不被替换）：
+      - ``` 围栏代码块 ```、行内 `code`
+      - $...$ 行内公式 与 $$...$$ 块级公式（LaTeX 内引号/语义符号不动）
+    配对：按段落（空行分隔）独立配对，段内首个 " → “（左），下一个 → ”（右），
+    交替进行，段落边界重置。已存在的中文引号不重复处理（幂等）。
+    不处理单引号 '，避免破坏英文缩写（don't / it's）。
+    仅处理「# 参考文献」之前的正文（与引用转换边界一致），文献列表保持原样。
+    """
+    lines = text.splitlines()
+    ref_idx = None
+    for i, ln in enumerate(lines):
+        if re.match(r"^#\s+参考文献\s*$", ln.strip()):
+            ref_idx = i
+            break
+    if ref_idx is not None:
+        body_text = "\n".join(lines[:ref_idx])
+        ref_text = "\n".join(lines[ref_idx:])
+        new_body, n = _normalize_quotes_body(body_text)
+        return new_body + "\n" + ref_text, n
+    return _normalize_quotes_body(text)
+
+
+def _normalize_quotes_body(body: str) -> tuple[str, int]:
+    protected = []
+    def _protect(m):
+        protected.append(m.group(0))
+        return f"\x00Q{len(protected) - 1}\x00"
+
+    # 1) 暂存需保护的区域
+    body = re.sub(r"```.*?```", _protect, body, flags=re.S)   # 围栏代码块
+    body = re.sub(r"`[^`\n]+`", _protect, body)               # 行内 code
+    body = re.sub(r"\$\$.*?\$\$", _protect, body, flags=re.S) # 块级公式
+    body = re.sub(r"(?<![\$])\$(?!\$)[^$\n]+?\$(?!\$)", _protect, body)  # 行内公式
+
+    # 2) 按段落配对替换直引号
+    paragraphs = re.split(r"\n{2,}", body)
+    out_paras = []
+    cnt = 0
+    for para in paragraphs:
+        buf = []
+        open_q = False
+        for ch in para:
+            if ch == '"':
+                buf.append("\u201c" if not open_q else "\u201d")
+                open_q = not open_q
+                cnt += 1
+            else:
+                buf.append(ch)
+        out_paras.append("".join(buf))
+    body = "\n\n".join(out_paras)
+
+    # 3) 还原保护区域
+    for i, seg in enumerate(protected):
+        body = body.replace(f"\x00Q{i}\x00", seg)
+    return body, cnt
+
+
+# ---------------------------------------------------------------------------
 # 作者-年份制 → GB/T 7714 顺序编码制（双语鲁棒版）
 # ---------------------------------------------------------------------------
 # 作用：把正文中的 （作者，年份）/ 作者（年份）/ Author (year) / 中文（English，year）
@@ -390,6 +456,43 @@ def _strip_cn(s: str) -> str:
     return s.strip()
 
 
+def _authors_before(pre: str) -> list[tuple[str, str]]:
+    """从括号前的文本尾部提取著者候选（first-author 优先）。
+
+    兼容多种"作者（年份）"写法，专治旧逻辑的两个盲区：
+      - 英文作者 + 等（年）：`Gao等（2023）` / `Aghion等（2020）`
+        （括号内只有年份，作者在括号外、被"等"隔开）
+      - 中文双作者 A和B（年）：`吴超鹏和唐菂（2016）`
+        （旧逻辑抓到最近的第二作者"唐菂"，此处按连接符拆出首作者"吴超鹏"）
+
+    仅抓取"紧贴括号、由著者连接符(和/与/、/，/,/&/and/空格)连成的著者串"，
+    避免误吸正文普通词；返回 [(author, kind), ...]，kind ∈ {"cn","en"}，
+    英文 token 按出现序、中文按分段给出，供上层逐一匹配参考文献表。
+    """
+    s = pre.rstrip()
+    # 去掉尾部的 "等 / 团队 / 课题组 / et al." 等群体后缀
+    s = re.sub(r"(?:等|团队|课题组)$", "", s)
+    s = re.sub(r"(?:et\s+al\.?)$", "", s, flags=re.I).rstrip()
+    # 尾部著者串：中英文名，以 和/与/、/，/,/&/and/空格 连接，锚定到末尾
+    m = re.search(
+        r"((?:[A-Z][a-zA-Z]+|[\u4e00-\u9fff]{2,4})"
+        r"(?:\s*(?:和|与|、|，|,|&|and)\s*(?:[A-Z][a-zA-Z]+|[\u4e00-\u9fff]{2,4}))*)$",
+        s,
+    )
+    if not m:
+        return []
+    chunk = m.group(1)
+    cands: list[tuple[str, str]] = []
+    for t in re.findall(r"[A-Z][a-zA-Z]+", chunk):
+        cands.append((t, "en"))
+    for seg in re.split(r"\s*(?:和|与|、|，|,|&|and)\s*", chunk):
+        if re.match(r"[\u4e00-\u9fff]", seg):
+            seg2 = _strip_cn(seg)
+            if len(seg2) >= 2:
+                cands.append((seg2, "cn"))
+    return cands
+
+
 def convert_author_year_to_gbt7714(text: str) -> tuple[str, int]:
     """作者-年份制正文 → GB/T 7714 顺序编码制（[N] 上标 + 按首现重排）。
 
@@ -414,22 +517,29 @@ def convert_author_year_to_gbt7714(text: str) -> tuple[str, int]:
         m = re.match(r"^\[(\d+[a-z]?)\]\s*(.*)$", ln)
         if m:
             bodytext = m.group(2)
-            ym = re.search(r"(?:19|20)\d{2}", bodytext)
-            year = ym.group(0) if ym else None
+            # 收集条目内出现的全部年份：出版年可能不在最前（标题里也可能含年份，
+            # 如 "...the 2021 antitrust crackdown...[J]. Journal, 2022"）。取第一个
+            # 作主 year（向后兼容），同时保留全部年份供匹配时任一命中即可。
+            years = re.findall(r"(?:19|20)\d{2}", bodytext)
+            year = years[0] if years else None
             if re.match(r"[\u4e00-\u9fff]", bodytext):
                 fa = re.match(r"([\u4e00-\u9fff]{2,4})", bodytext)
                 fa = fa.group(1) if fa else ""
             else:
                 fa_m = re.match(r"([A-Za-z]+)", bodytext)
                 fa = fa_m.group(1) if fa_m else ""
-            ref_entries.append({"body": bodytext, "fa": fa, "year": year})
+            ref_entries.append({"body": bodytext, "fa": fa,
+                                "year": year, "years": years})
     if not ref_entries:
         return text, 0
 
+    # 一个文献条目在其【全部年份】下都建键：正文引用年份命中任一即算匹配，
+    # 解决"标题含其他年份导致出版年被首年份覆盖"的误配（如 Haque 2022）。
     ref_keys: dict[tuple[str, str], list[int]] = {}
     for i, e in enumerate(ref_entries):
-        if e["year"] and e["fa"]:
-            ref_keys.setdefault((_norm_author(e["fa"]), e["year"]), []).append(i)
+        if e["fa"] and e["years"]:
+            for y in dict.fromkeys(e["years"]):
+                ref_keys.setdefault((_norm_author(e["fa"]), y), []).append(i)
 
     # 2) 检测所有含年份的括号引文
     repl = []
@@ -439,26 +549,31 @@ def convert_author_year_to_gbt7714(text: str) -> tuple[str, int]:
         if not ym:
             continue
         year = ym.group(0)
-        en_names = re.findall(r"[A-Z][a-zA-Z]+", inner)
-        pre = body_text[:m.start()]
-        cn_prev = re.search(r"([\u4e00-\u9fff]{2,4})$", pre)
-        cn_prefix = _strip_cn(cn_prev.group(1)) if cn_prev else ""
-        cn_inside = re.search(r"^([\u4e00-\u9fff]{2,4})", inner)
-        cn_inside_name = _strip_cn(cn_inside.group(1)) if cn_inside else ""
         pairs = []
-        if len(cn_prefix) >= 2:
-            pairs.append((cn_prefix, year, "cn"))
-        if len(cn_inside_name) >= 2:
-            pairs.append((cn_inside_name, year, "cn"))
-        for en in en_names:
+        # (a) 括号前的著者串：Gao等（2023）/ 吴超鹏和唐菂（2016）/ Katz & Shapiro …
+        #     由 _authors_before 统一处理英文名、中文首作者、多作者连接等盲区。
+        for (a, kind) in _authors_before(body_text[:m.start()]):
+            pairs.append((a, year, kind))
+        # (b) 括号内的著者：（作者，2023）/（Katz & Shapiro，1985）
+        for en in re.findall(r"[A-Z][a-zA-Z]+", inner):
             pairs.append((en, year, "en"))
-        if pairs:
-            repl.append((m.start(), m.end(), pairs))
-
-    # 外文 inline（无中文括号）SomeName (year)
-    for m in re.finditer(r"([A-Z][a-zA-Z]+?)\s*\((\d{4})\)", body_text):
-        repl.append((body_text.index("(", m.start()), m.end(),
-                     [(m.group(1), m.group(2), "en")]))
+        # 括号内中文著者：可能是 "A和B，year"（花合凤和谢莉娟，2022），
+        # 在连接符处切出首作者，避免把"花合凤和"整体当作者名。
+        cn_inside = re.search(r"^([\u4e00-\u9fff]{2,}(?:[和与、，][\u4e00-\u9fff]{2,})*)", inner)
+        if cn_inside:
+            ci = _strip_cn(re.split(r"[和与、，]", cn_inside.group(1))[0])
+            if len(ci) >= 2:
+                pairs.append((ci, year, "cn"))
+        # 去重保序（同一著者可能被括号内外重复捕获）
+        seen_pair = set()
+        uniq_pairs = []
+        for p in pairs:
+            key = (_norm_author(p[0]), p[1], p[2])
+            if key not in seen_pair:
+                seen_pair.add(key)
+                uniq_pairs.append(p)
+        if uniq_pairs:
+            repl.append((m.start(), m.end(), uniq_pairs))
 
     repl.sort(key=lambda x: x[0])
     cleaned = []
@@ -607,6 +722,7 @@ def main(argv: list[str] | None = None) -> int:
 
     converted, m = promote_back_matter(converted)
     converted, k = normalize_display_math(converted)
+    converted, qn = normalize_quotes(converted)
     converted, g = convert_author_year_to_gbt7714(converted)
     converted, r = sort_references_by_citation(converted)
     converted, h = strip_hr_before_heading(converted)
@@ -628,6 +744,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[ok] 归一 {k} 个单行展示公式 `$$ 公式 $$` → 多行块（修复 OMML 转换失败）")
     if g:
         print(f"[ok] 作者-年份引文 → GB/T 7714 顺序编码 [N] 上标并据首现重排文献 {g} 处")
+    if qn:
+        print(f"[ok] 规范化 {qn} 个半角直引号 → 中文引号“ ”（正文，参考文献列表保持原样）")
     if r:
         print(f"[ok] 按正文首次引用顺序重排并重编号 {r} 条参考文献（GB/T 7714 顺序编码制）")
     if h:
