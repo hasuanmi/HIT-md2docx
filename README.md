@@ -31,10 +31,13 @@ HIT-md2docx/
 │   ├── references/          # 哈工大格式规范、自查清单、范例 MD
 │   └── agents/openai.yaml
 ├── input/                   # 资源：封面.docx（官方封面模板）+ heading_translations.json（中英文目录映射，可选）
-├── example/                 # 自包含样例
-│   ├── thesis-demo-hit.md                               # 最小可跑 demo（含图片、翻译表）
-│   ├── 论文_平台反垄断与研发投入.md                       # 真实范文：md 源（引擎可直接消费）
-│   └── 论文_平台反垄断与研发投入_HIT硕士规范版.docx       # 同上范文的成品 docx，供审阅/对照版式
+├── example/                 # 自包含样例（《中国制造2025》论文，本科/硕士/博士三层次）
+│   ├── 论文_中国制造2025产业政策与新质生产力.md                    # 范文 md 源（经济学实证，演示用模拟数据）
+│   ├── 论文_中国制造2025产业政策与新质生产力_HIT本科规范版.docx     # 成品 docx（本科）
+│   ├── 论文_中国制造2025产业政策与新质生产力_HIT硕士规范版.docx     # 成品 docx（硕士）
+│   ├── 论文_中国制造2025产业政策与新质生产力_HIT博士规范版.docx     # 成品 docx（博士）
+│   ├── figures/                                                 # 范文配图
+│   └── heading_translations.json                                # 本范文的英文目录翻译表（agent 预翻译产物）
 ├── thesis-specs/            # 论文规范文件：模板.docx / 封面.docx / 硕士学位论文格式要求及审查要点.docx
 ├── md2docx.py               # CLI 入口
 ├── 模板.docx                # 哈工大论文完整模板（参考用）
@@ -42,7 +45,7 @@ HIT-md2docx/
 ```
 
 > **想直接看效果 / 对照规范？**
-> - 真实范文（md + 成品 docx）已放进 `example/`：`论文_平台反垄断与研发投入.md` 与 `论文_平台反垄断与研发投入_HIT硕士规范版.docx`，clone 后即可审阅版式。
+> - 完整范文（md + 本科/硕士/博士三份成品 docx）已放进 `example/`：`论文_中国制造2025产业政策与新质生产力.md` 与 `论文_中国制造2025产业政策与新质生产力_HIT*规范版.docx`，clone 后即可审阅版式。
 > - 哈工大官方模板、封面、审查要点统一放在 `thesis-specs/`（详见该目录 `README.md`）。
 
 ---
@@ -54,7 +57,7 @@ HIT-md2docx/
 需要 Python ≥ 3.10。
 
 ```bash
-git clone https://github.com/484899614-shipi-it/HIT-md2docx.git
+git clone https://github.com/hasuanmi/HIT-md2docx.git
 cd HIT-md2docx
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
 pip install -e .                                   # 可编辑安装，得到 md2docx 命令
@@ -102,9 +105,11 @@ md2docx all --profile hit-master-thesis 你的论文.md 论文.docx 论文.pdf -
 ```
 
 ---
-## 用 WorkBuddy 的「一键」体验（可选）
+## 在 WorkBuddy / Comate 里使用（可选）
 
-如果你用 WorkBuddy，把本仓库作为一个 skill 来源即可：将 `skill/` 作为 skill 目录加载（或通过专家中心导入），然后对它说「帮我把这篇 Markdown 转成符合哈工大规范的 Word」，它会按固定流程走完：确认层次 → 读取 → MD 预处理 → 模板填充 → 封面注入 → 规范校验 → 自动修复 → 层次适配 → 导出报告。
+本工具是**独立的 Python 命令行程序**；仓库内的 `skill/` 目录只是一份可选的 **WorkBuddy skill 编排层**。把它作为 skill 来源加载（或通过专家中心导入）后，即可获得「一键」体验：对它说「帮我把这篇 Markdown 转成符合哈工大规范的 Word」，它会按固定流程走完：确认层次 → 读取论文 → MD 预处理 → **英文目录预翻译（agent 用自己的 LLM 写 `heading_translations.json`，零外部 API）** → 模板填充 → 封面注入 → 规范校验 → 自动修复 → 层次适配 → 导出报告。
+
+> 不经 agent、直接裸跑脚本也完全没问题（见上方「快速开始」）。只是英文目录需要你用行内 `| English` 或预填字典，或自行配置 `HITMD2DOCX_LLM_*` 走外部 API 兜底——工具本身不依赖任何平台 LLM。
 
 ---
 
