@@ -11,9 +11,12 @@ cover_inject.py — HIT 硕士论文"封面与前置部分版式注入"（标准
   3. 对齐前置部分（封面 + 摘要页）行距到官方《书写范例》：摘要标题段距、摘要正文行距。
 
 题目来源（按优先级）：
-  a) 命令行 --cn-title / --en-title
-  b) front_matter（默认 input/front_matter_hit.md 的"论文题目："/"英文题目："）
+  a) 命令行 --cn-title / --en-title（agent 在 2.5 预翻译后传入，最高优先）
+  b) front_matter（论文自己的"论文题目："/"英文题目："；模板不应写死真实题目）
   c) 从输入 docx 现有封面区提取（自包含兜底）
+  d) 英文题目在 a/b/c 均缺失、且配置了 HITMD2DOCX_LLM_API_KEY 时，
+     由 thesis_md2docx.translation 调用 LLM 翻译中文题目生成（与英文目录
+     同一套机制，且受同一个 HITMD2DOCX_NO_LLM 开关控制），绝不回退写死样例。
 
 健壮性：
   - 找不到 封面.docx 模板 → 跳过封面复制，仅做目录/行距，不报错（流程可无模板运行）。
@@ -30,6 +33,7 @@ import copy
 import os
 import re
 import sys
+from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -44,7 +48,7 @@ W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 Q = lambda t: f"{{{W}}}{t}"
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-ENGINE_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))   # HITmd2docx/ (scripts -> skill -> HITmd2docx)
+ENGINE_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))   # HIT-md2docx/ (scripts -> skill -> HIT-md2docx)
 DEFAULT_COVER = os.path.join(ENGINE_ROOT, "input", "封面.docx")
 DEFAULT_FRONT = os.path.join(ENGINE_ROOT, "input", "front_matter_hit.md")
 
@@ -94,7 +98,36 @@ def _extract_titles_from_doc(doc: Document):
     return cn, en
 
 
-def extract_titles(front_path, doc, cli_cn=None, cli_en=None):
+def _llm_translate_title(cn: str, markdown_dir=None):
+    """与英文目录 translation.py 同一套 LLM 兜底：配置了 API key 时翻译中文题目。
+
+    返回英文题字符串或 None（未配置 key / 翻译失败 / 被 HITMD2DOCX_NO_LLM 禁用）。
+    绝不返回写死的样例标题。
+    """
+    if not cn or os.environ.get("HITMD2DOCX_NO_LLM"):
+        return None
+    try:
+        if ENGINE_ROOT not in sys.path:
+            sys.path.insert(0, ENGINE_ROOT)
+        from thesis_md2docx import translation
+    except Exception:
+        return None
+    try:
+        cfg = translation.load_llm_config(
+            Path(markdown_dir) if markdown_dir else None
+        )
+    except Exception:
+        return None
+    if not cfg:
+        return None
+    try:
+        tr = translation.translate_headings([cn], config=cfg)
+        return tr.get(cn)
+    except Exception:
+        return None
+
+
+def extract_titles(front_path, doc, cli_cn=None, cli_en=None, markdown_dir=None):
     cn, en = _read_front_titles(front_path)
     if cli_cn:
         cn = cli_cn
@@ -104,6 +137,10 @@ def extract_titles(front_path, doc, cli_cn=None, cli_en=None):
         dcn, den = _extract_titles_from_doc(doc)
         cn = cn or dcn
         en = en or den
+    # 与英文目录一致：a/b/c 都缺英文题时，配了 LLM key 则调用 LLM 生成，
+    # 绝不回退到写死的样例英文题（模板里的「英文题目：」应为空）。
+    if not en and cn:
+        en = _llm_translate_title(cn, markdown_dir)
     return cn, en
 
 
@@ -811,12 +848,14 @@ def main():
     ap.add_argument("--front-matter", default=DEFAULT_FRONT, help="front_matter_hit.md 路径")
     ap.add_argument("--cn-title", default=None, help="中文题目（优先于 front_matter）")
     ap.add_argument("--en-title", default=None, help="英文题目（优先于 front_matter）")
+    ap.add_argument("--markdown-dir", default=None,
+                    help="论文 md 所在目录，用于加载 .env / LLM 翻译配置（与英文目录同一来源）")
     ap.add_argument("--out", default=None, help="输出路径，默认覆盖原文件")
     ap.add_argument("--no-spacing", action="store_true", help="跳过前置部分行距对齐")
     args = ap.parse_args()
 
     target = Document(args.docx)
-    cn, en = extract_titles(args.front_matter, target, args.cn_title, args.en_title)
+    cn, en = extract_titles(args.front_matter, target, args.cn_title, args.en_title, args.markdown_dir)
     print(f"题目: 中文={cn!r} 英文={en!r}")
 
     cover_changed = False

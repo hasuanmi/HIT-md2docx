@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from .base import ThesisProfile
 from .hit_master_thesis import HitMasterThesisProfile
-from .xju_undergraduate_thesis import XjuUndergraduateThesisProfile
 
 
 DEFAULT_PROFILE_NAME = "hit-master-thesis"
-PROFILES: tuple[ThesisProfile, ...] = (HitMasterThesisProfile(), XjuUndergraduateThesisProfile())
+PROFILES: tuple[ThesisProfile, ...] = (HitMasterThesisProfile(),)
 PROFILE_BY_NAME: dict[str, ThesisProfile] = {profile.name: profile for profile in PROFILES}
 
 

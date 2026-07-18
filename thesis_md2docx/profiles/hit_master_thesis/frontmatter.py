@@ -78,7 +78,7 @@ HIT_COVER_FIELDS_EN: tuple[CoverFieldSpec, ...] = (
 )
 
 
-XJU_DECLARATION_SIGNATURE = DeclarationSignatureSpec()
+HIT_DECLARATION_SIGNATURE = DeclarationSignatureSpec()
 
 
 def _contains_cjk_text(text: str) -> bool:

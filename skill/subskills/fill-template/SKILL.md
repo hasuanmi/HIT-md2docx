@@ -1,6 +1,6 @@
 ---
 name: hit-fill-template
-description: 基于 python-docx 底层能力，把结构化富文本填充进 HIT 硕士论文模板——保留分节、页眉双线、目录域。在 HITmd2docx 流程的第 3 步调用。
+description: 基于 python-docx 底层能力，把结构化富文本填充进 HIT 硕士论文模板——保留分节、页眉双线、目录域。在 HIT-md2docx 流程的第 3 步调用。
 ---
 
 # Docx 模板填充 Skill（步骤 3）
@@ -24,4 +24,4 @@ description: 基于 python-docx 底层能力，把结构化富文本填充进 HI
 - 仅当新增学校/学位维度时，才扩展 profile；日常格式微调交给步骤 4/5 的校验与修复。
 
 ## 参考
-- `references/template-spec.md`（第 8 节样式 id） · `skill/scripts/export_docx.sh` · `skill/scripts/export_pdf.sh`
+- `skill/references/template-spec.md`（第 8 节样式 id） · `skill/scripts/export_docx.sh` · `skill/scripts/export_pdf.sh`

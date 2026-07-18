@@ -1,6 +1,6 @@
 ## 封面信息
-论文题目：平台反垄断监管对数字平台企业研发投入的影响研究
-英文题目：RESEARCH ON THE IMPACT OF PLATFORM ANTI-MONOPOLY REGULATION ON R&D INVESTMENT OF DIGITAL PLATFORM ENTERPRISES
+论文题目：（请替换为你论文的中文题目）
+英文题目：
 作者：张三
 学号：×××××
 所在单位：深圳研究生院

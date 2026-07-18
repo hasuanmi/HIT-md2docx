@@ -45,7 +45,7 @@ def add_docx_options(parser: argparse.ArgumentParser) -> None:
         "--assets-dir",
         type=Path,
         default=None,
-        help="Directory containing cover assets such as xju-emblem.jpeg and xju-wordmark.png.",
+        help="Directory containing cover assets such as hit-emblem.jpeg and hit-wordmark.png.",
     )
     parser.add_argument("--no-cover-assets", action="store_true", help="Disable cover logos.")
     parser.add_argument(

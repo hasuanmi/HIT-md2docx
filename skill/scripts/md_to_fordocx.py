@@ -668,7 +668,7 @@ def main(argv: list[str] | None = None) -> int:
     # 在 latex 末尾交由引擎提取为右对齐公式号。
     _here = Path(__file__).resolve()
     _engine_scripts_candidates = [
-        _here.parent.parent.parent / "scripts",   # HITmd2docx/skill/scripts → HITmd2docx/scripts
+        _here.parent.parent.parent / "scripts",   # HIT-md2docx/skill/scripts → HIT-md2docx/scripts
         _here.parent / "scripts",                 # 兜底：同目录
     ]
     _engine_scripts = next((p for p in _engine_scripts_candidates if p.exists()), None)
@@ -691,7 +691,7 @@ def main(argv: list[str] | None = None) -> int:
                 fm_path = Path(args.front_matter)
             else:
                 # 自动定位固定前置模板，兼容两种目录布局：
-                #  - 规范仓库: HITmd2docx/skill/scripts/ → ../../../input/
+                #  - 规范仓库: HIT-md2docx/skill/scripts/ → ../../../input/
                 #  - 注册专家包: .../hitmd2docx/scripts/ → ../input/
                 here = Path(__file__).resolve()
                 candidates = [

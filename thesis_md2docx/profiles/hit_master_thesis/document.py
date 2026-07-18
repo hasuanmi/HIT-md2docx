@@ -28,7 +28,7 @@ from .frontmatter import (
     build_statement_body_paragraph,
     build_statement_signature_paragraph,
     build_taskbook_elements,
-    XJU_DECLARATION_SIGNATURE,
+    HIT_DECLARATION_SIGNATURE,
 )
 from .header_footer import title_header_xml
 from ...frontmatter import parse_inline_image_value, split_statement_content
@@ -55,7 +55,7 @@ from ...ooxml.parts import native_sect_pr_xml
 from ...ooxml.xml import spacing_xml
 from ...ooxml.xml import indent_xml
 from ...styles import StyleRole
-from ...toc import TocEntry, make_toc_entry, split_bilingual, strip_bilingual
+from ...toc import TocEntry, make_toc_entry, split_bilingual, strip_bilingual, normalize_heading_key
 from ...translation import (
     load_llm_cache,
     load_llm_config,
@@ -352,26 +352,26 @@ def _append_declaration_page(
             )
         )
     signature_image = None
-    signature_alt = XJU_DECLARATION_SIGNATURE.signature_alt
+    signature_alt = HIT_DECLARATION_SIGNATURE.signature_alt
     inline_signature = parse_inline_image_value(author_value)
     if inline_signature is not None and media_manager is not None and markdown_dir is not None:
         signature_alt, signature_target = inline_signature
         signature_image = media_manager.register_image(markdown_dir / signature_target)
         if signature_image is not None:
             author_value = ""
-    for _ in range(XJU_DECLARATION_SIGNATURE.blank_count(has_signature_image=signature_image is not None)):
+    for _ in range(HIT_DECLARATION_SIGNATURE.blank_count(has_signature_image=signature_image is not None)):
         elements.append(build_blank_paragraph(run_size=24))
     elements.append(
         build_statement_signature_paragraph(
-            XJU_DECLARATION_SIGNATURE.author_label,
+            HIT_DECLARATION_SIGNATURE.author_label,
             author_value,
             signature_image=signature_image,
             media_manager=media_manager,
-            signature_alt=signature_alt or XJU_DECLARATION_SIGNATURE.signature_alt,
+            signature_alt=signature_alt or HIT_DECLARATION_SIGNATURE.signature_alt,
         )
     )
     elements.append(
-        build_statement_signature_paragraph(XJU_DECLARATION_SIGNATURE.date_label, date_value, is_date=True)
+        build_statement_signature_paragraph(HIT_DECLARATION_SIGNATURE.date_label, date_value, is_date=True)
     )
     if page.page_break_after:
         if section_break_after:
@@ -445,7 +445,7 @@ def _render_pdf_pages_to_png(pdf_path: Path) -> list[Path]:
     pdftoppm = shutil.which("pdftoppm")
     if not pdftoppm:
         raise RuntimeError("pdftoppm not found; install poppler-utils or add pdftoppm to PATH")
-    output_dir = Path(tempfile.mkdtemp(prefix="xju-taskbook-pdf-"))
+    output_dir = Path(tempfile.mkdtemp(prefix="hit-taskbook-pdf-"))
     output_prefix = output_dir / "page"
     result = subprocess.run(
         [pdftoppm, "-png", "-r", str(PDF_PAGE_IMAGE_DPI), str(pdf_path), str(output_prefix)],
@@ -690,7 +690,9 @@ def _load_heading_translations(markdown_dir: Path | None) -> dict[str, str]:
     try:
         import json
 
-        return json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
+        # 加载即归一化 key：字典里写弯引号/全角标点也能命中论文的直引号标题
+        return {normalize_heading_key(k): v for k, v in data.items()}
     except Exception:
         return {}
 
@@ -734,8 +736,10 @@ def _format_toc_english_number(
     m = _TOC_NUM_RE.match(entry.text)
     if not m:
         # 无编号的条目标题（如“参考文献”“致谢”“附录”）直接按映射翻译并加粗
-        _cn, en = split_bilingual(entry.text.strip())
-        english_label = en or translations.get(entry.text.strip(), entry.text.strip())
+        _raw = entry.text.strip()
+        _cn, en = split_bilingual(_raw)
+        # 查表 key 归一化：字典写弯引号/全角标点也能命中
+        english_label = en or translations.get(normalize_heading_key(_raw), _raw)
         if english_label == entry.text.strip() and not en:
             return entry
         return TocEntry(
@@ -746,8 +750,10 @@ def _format_toc_english_number(
         )
     num = m.group(1).strip()  # 例如 "1" / "1.1" / "1.1.1"
     _cn, en = split_bilingual(m.group(2).strip())
-    label = strip_bilingual(m.group(2).strip())
-    english_label = en or translations.get(label, label)
+    raw_label = strip_bilingual(m.group(2).strip())
+    # 查表 key 归一化：字典写弯引号/全角标点也能命中论文直引号标题
+    label = normalize_heading_key(raw_label)
+    english_label = en or translations.get(label, raw_label)
     try:
         parts = num.split(".")
         if entry.level == 1:
@@ -886,13 +892,15 @@ def build_document(
     # 标题里的行内 `中文 | English` 优先级最高，未命中则回退中文。
     heading_translations = _load_heading_translations(markdown_dir)
     llm_cache = load_llm_cache(markdown_dir)
-    # 合并字典：用户映射覆盖 LLM 缓存
-    _combined = {**llm_cache, **heading_translations}
+    # 合并字典：用户映射覆盖 LLM 缓存；LLM 缓存 key 一并归一化
+    _combined = {**{normalize_heading_key(k): v for k, v in llm_cache.items()},
+                 **heading_translations}
     # 收集既无行内英文、又不在合并字典里的缺失标题，按需批量调 LLM 翻译并缓存
     _missing = set()
     for _e in toc_entries_raw:
         _m = _TOC_NUM_RE.match(_e.text)
-        _raw_label = (_m.group(2) if _m else _e.text).strip()
+        # 归一化后再判“是否已在合并字典”，与字典加载/查表时的归一化保持一致
+        _raw_label = normalize_heading_key((_m.group(2) if _m else _e.text).strip())
         _cn, _en = split_bilingual(_raw_label)
         if _en or _raw_label in _combined:
             continue
@@ -907,7 +915,8 @@ def build_document(
             if _translated:
                 llm_cache.update(_translated)
                 save_llm_cache(markdown_dir, llm_cache)
-                _combined = {**llm_cache, **heading_translations}
+                _combined = {**{normalize_heading_key(k): v for k, v in llm_cache.items()},
+                                **heading_translations}
     toc_entries_en = [
         TocEntry(level=1, text="**Abstract(In Chinese)**", anchor=abstract_cn_entry.anchor, bookmark_id=abstract_cn_entry.bookmark_id),
         TocEntry(level=1, text="**Abstract(In English)**", anchor=abstract_en_entry.anchor, bookmark_id=abstract_en_entry.bookmark_id),

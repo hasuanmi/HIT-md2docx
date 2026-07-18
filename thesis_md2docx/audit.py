@@ -639,7 +639,7 @@ def add_compare_docx_parser(subparsers: argparse._SubParsersAction[argparse.Argu
 
 
 def run_compare_docx(args: argparse.Namespace) -> int:
-    queries = args.query or ["新疆大学本科毕业论文", "摘  要", "ABSTRACT", "目  录", "绪论", "参考文献", "致  谢", "附"]
+    queries = args.query or ["摘  要", "ABSTRACT", "目  录", "绪论", "参考文献", "致  谢", "附"]
     report = compare_docx(args.reference, args.candidate, queries=queries)
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)

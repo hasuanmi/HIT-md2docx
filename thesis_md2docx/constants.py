@@ -37,8 +37,8 @@ OMML_ACCENT_CHAR_MAP = {
     "¯": "\u0305",
     "ˉ": "\u0305",
 }
-COVER_EMBLEM_NAME = "xju-emblem.jpeg"
-COVER_WORDMARK_NAME = "xju-wordmark.png"
+COVER_EMBLEM_NAME = "hit-emblem.jpeg"
+COVER_WORDMARK_NAME = "hit-wordmark.png"
 
 IMAGE_CONTENT_TYPES = {
     "png": "image/png",

@@ -1,6 +1,6 @@
 ---
 name: hit-md-to-richtext
-description: 将论文 Markdown 转为结构化富文本——标题层级绑定 HIT Word 样式、清理 Markdown 标记（加粗/斜体/链接/列表/表格/公式）。在 HITmd2docx 流程的第 2 步调用。
+description: 将论文 Markdown 转为结构化富文本——标题层级绑定 HIT Word 样式、清理 Markdown 标记（加粗/斜体/链接/列表/表格/公式）。在 HIT-md2docx 流程的第 2 步调用。
 ---
 
 # MD 转结构化富文本 Skill（步骤 2）
@@ -15,7 +15,7 @@ description: 将论文 Markdown 转为结构化富文本——标题层级绑定
 - 引用 `[1]`、`[1-3]`、`[3]92` 保留为上标标记，待步骤 3 渲染。
 
 ## 步骤
-1. 依据 `references/example-md.md` 的结构解析 front matter 与正文。
+1. 依据 `skill/references/example-md.md` 的结构解析 front matter 与正文。
 2. 清理 Markdown 标记，生成"标题层级 + 样式意图"的中间表示。
 3. 不做版式微调（行距/缩进/页眉由 profile 与步骤 4/5 负责），避免在此重复造轮子引发回归。
 
@@ -24,4 +24,4 @@ description: 将论文 Markdown 转为结构化富文本——标题层级绑定
 - 公式缺失依赖时回退 LaTeX 文本并在报告中提示。
 
 ## 参考
-- `references/example-md.md` · `references/markdown-usage.md` · `references/template-spec.md`
+- `skill/references/example-md.md` · `skill/references/markdown-usage.md` · `skill/references/template-spec.md`

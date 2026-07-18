@@ -1,6 +1,6 @@
 ---
 name: hit-report
-description: 导出格式问题清单（Markdown/HTML），汇总审计结果与修复建议，便于人工逐项核对。在 HITmd2docx 流程的第 6 步调用。
+description: 导出格式问题清单（Markdown/HTML），汇总审计结果与修复建议，便于人工逐项核对。在 HIT-md2docx 流程的第 6 步调用。
 ---
 
 # 导出报告 Skill（步骤 6）
@@ -21,4 +21,4 @@ description: 导出格式问题清单（Markdown/HTML），汇总审计结果与
 - 尾部：机检范围说明与人工复核提醒。
 
 ## 参考
-- `skill/scripts/report.py` · `references/selfcheck-checklist.md`
+- `skill/scripts/report.py` · `skill/references/selfcheck-checklist.md`

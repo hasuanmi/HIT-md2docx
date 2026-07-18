@@ -33,5 +33,5 @@ python skill/scripts/report.py audit.json --md 问题清单.md
 
 - **解耦**：校验/修复只作用于"依赖作者 Markdown 内容、生成器保证不了"的项；字体/字号/行距/页眉双线由 `hit_master_thesis` profile 正确生成，不重复校验。
 - **数据驱动**：规则集中在 `format_rules.py`，新增/微调规则不碰生成代码。
-- **幂等 + 测试**：`tests/test_audit_fix.py` 用带已知问题的样例 docx 断言"检出→修复→再审计不变"，任何回归立即暴露。
+- **幂等**：自动修复脚本连续运行两次，第二次改动数为 0（已手测验证），避免引入新错。
 - **仅检测项**（R03/R04/R07/R08/R09/R10/R11）交人工在 Word/WPS 复核，避免自动修复引入新错。

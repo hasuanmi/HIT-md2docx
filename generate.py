@@ -89,7 +89,7 @@ def dump_headings_and_exit(input_md: str, profile_name: str, front_matter):
         from thesis_md2docx.profiles import get_profile
         from thesis_md2docx.builders.document import collect_toc_entries
         from thesis_md2docx.markdown import parse_markdown_document
-        from thesis_md2docx.toc import split_bilingual, strip_bilingual
+        from thesis_md2docx.toc import split_bilingual, strip_bilingual, normalize_heading_key
         from thesis_md2docx.profiles.hit_master_thesis.document import (
             _TOC_NUM_RE, HIT_MASTER_ACHIEVEMENTS_TITLE, HIT_DECLARATION_TITLE,
         )
@@ -125,6 +125,7 @@ def dump_headings_and_exit(input_md: str, profile_name: str, front_matter):
     if jp.exists():
         try:
             existing = json.loads(jp.read_text(encoding="utf-8"))
+            existing = {normalize_heading_key(k): v for k, v in existing.items()}
         except Exception:
             existing = {}
 
@@ -133,8 +134,8 @@ def dump_headings_and_exit(input_md: str, profile_name: str, front_matter):
     def _key_of(text: str) -> str:
         m = _TOC_NUM_RE.match(text)
         if m:
-            return strip_bilingual(m.group(2).strip())
-        return text.strip()
+            return normalize_heading_key(strip_bilingual(m.group(2).strip()))
+        return normalize_heading_key(text.strip())
 
     for e in entries:
         key = _key_of(e.text)
@@ -337,6 +338,31 @@ def main():
             print(f"  ⚠ 层次适配返回非零 ({r3.returncode})")
     else:
         print("[3/3] 层次适配: master（无需改写）")
+
+    # ---- Step 3.5: 封面表格字段补填（生成后处理）----
+    # cover_inject 只替换题目，封面表格其余字段（作者/导师/申请学位/学科/
+    # 所在单位/答辩日期 + 英文 6 字段）在官方模板里是空的。这里按 front_matter
+    # 的已知值补填；真实姓名/导师在 front_matter 里是「待填写」占位符，如实填入。
+    # 放在层次适配之后：bachelor/doctor 时封面标签已被改写为「本科/博士」，
+    # 此时按新标签匹配补填，逻辑自洽。
+    fill_script = os.path.join(ENGINE_ROOT, "skill", "scripts", "fill_cover.py")
+    if os.path.isfile(fill_script) and args.front_matter and os.path.isfile(args.front_matter):
+        print("[3.5] 补填封面表格字段 (fill_cover) ...")
+        cmd35 = [py, fill_script, temp_docx,
+                 "--front-matter", args.front_matter,
+                 "--degree", args.degree, "--out", temp_docx]
+        r35 = subprocess.run(cmd35, cwd=ENGINE_ROOT, env=child_env,
+                             capture_output=True, text=True,
+                             encoding="utf-8", errors="replace")
+        if r35.stdout:
+            print(r35.stdout.strip())
+        if r35.stderr:
+            print(r35.stderr.strip(), file=sys.stderr)
+        if r35.returncode != 0:
+            print("  ⚠ 封面字段补填返回非零，封面部分字段可能仍为空（不影响主流程）",
+                  file=sys.stderr)
+    elif not args.front_matter:
+        print("[3.5] 跳过封面字段补填（未指定 --front-matter）")
 
     # ---- Step 4: 字体规范修复（fix_docx，R12 等）----
     # 正文/公式中的拉丁字母需 Times New Roman；幂等，可重复运行。
