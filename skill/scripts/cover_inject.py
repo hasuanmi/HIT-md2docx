@@ -251,14 +251,12 @@ def _en_title_lines(text: str, usable_pt: float) -> int:
     return max(1, math.ceil(n / per_line))
 
 
-def compress_cover_gap(cover: Document, remove_n: int, keep_min: int = 3) -> int:
-    """删除"哈尔滨工业大学"上方紧邻的若干空行，把校名/年月块拉回第一页底部。
+def shrink_cover_remaining_gaps(cover: Document, target_pt: float = 6.0) -> int:
+    """将「哈尔滨工业大学」上方剩余空行的行距缩小到 target_pt（兜底机制）。
 
-    只删除紧邻校名块上方的连续空段落（题目区与校名块之间的排版留白），
-    保留至少 keep_min 个空行以维持底部间距；从最靠近校名块的一侧开始删。
+    当题目特别长、仅靠删除空行仍无法把年月拉回首页时，进一步压缩
+    留存空行的高度。每行约省 (12.6 - target_pt) pt。
     """
-    if remove_n <= 0:
-        return 0
     paras = cover.paragraphs
     anchor = None
     for i, p in enumerate(paras):
@@ -267,11 +265,53 @@ def compress_cover_gap(cover: Document, remove_n: int, keep_min: int = 3) -> int
             break
     if anchor is None:
         return 0
+    n = 0
+    j = anchor - 1
+    while j >= 0 and paras[j].text.strip() == "":
+        _set_para_spacing(paras[j], line=int(target_pt * 20), rule="auto")  # pt → twips (1pt=20twips)
+        n += 1
+        j -= 1
+    return n
+
+
+def compress_cover_gap(cover: Document, remove_n: int, keep_min: int = 2) -> int:
+    """删除"哈尔滨工业大学"上方紧邻的若干空行，把校名/年月块拉回第一页底部。
+
+    保护块 = 「哈尔滨工业大学」段 + 其后紧跟的「年 月」段（两者必须在同一页）。
+    只删除紧邻校名块上方的连续空段落（题目区与校名块之间的排版留白），
+    保留至少 keep_min 个空行以维持底部间距；从最靠近校名块的一侧开始删。
+    """
+    if remove_n <= 0:
+        return 0
+    paras = cover.paragraphs
+    anchor = None
+    year_month_idx = None
+    for i, p in enumerate(paras):
+        if "哈尔滨工业大学" in p.text:
+            anchor = i
+            # 向下找紧跟的「年 月」段（模板中两者相邻）
+            j = i + 1
+            while j < len(paras) and paras[j].text.strip() == "":
+                j += 1
+            if j < len(paras) and ("年" in paras[j].text and "月" in paras[j].text):
+                year_month_idx = j
+            break
+    if anchor is None:
+        return 0
+
+    # 空行列表：校名段上方连续空段
     empties = []
     j = anchor - 1
     while j >= 0 and paras[j].text.strip() == "":
         empties.append(paras[j])
         j -= 1
+
+    # 如果年月段与校名段之间还有空行，也纳入可压缩范围
+    if year_month_idx is not None and year_month_idx > anchor + 1:
+        for k in range(anchor + 1, year_month_idx):
+            if paras[k].text.strip() == "":
+                empties.append(paras[k])
+
     removable = max(0, len(empties) - keep_min)
     to_remove = min(remove_n, removable)
     removed = 0
@@ -376,14 +416,31 @@ def replace_cover_titles(cover: Document, cn, en):
             else:
                 i += 1
 
-    # —— 题目变长 → 等比例压缩校名块上方空行，把"哈尔滨工业大学 / 年 月"拉回第一页底部 ——
+    # —— 题目变长 → 适量压缩校名块上方空行，把"哈尔滨工业大学 / 年 月"拉回第一页底部 ——
+    # 注意：原模板（17字+79字符英文）在A4封面下恰好让校名落在第1页底部（15个空行）。
+    # 用户题目（22字+109字符）算法估多 1 行 → 实际渲染多 0~1 行。
+    # 不删/微删即可，不要过度压缩（过度会把校名挤到第2页）。
+    # 布局锚定模式：封面模板中「哈尔滨工业大学」段已带 w:framePr（固定钉在 P1 底部），
+    # 校名/年月与标题行数彻底解耦，无需也不会压缩空行，直接跳过。
+    anchored = False
+    for p in paras:
+        if "哈尔滨工业大学" in p.text:
+            pPr = p._p.find(Q("pPr"))
+            if pPr is not None and pPr.find(Q("framePr")) is not None:
+                anchored = True
+            break
+    if anchored:
+        print("   布局锚定模式：校名/年月已固定钉在 P1 底部，跳过空行压缩")
+        return n
     base_lines = _cjk_title_lines(orig_cn or "", usable_pt) + _en_title_lines(orig_en, usable_pt)
     new_lines = _cjk_title_lines(cn or orig_cn or "", usable_pt) + _en_title_lines(en or orig_en, usable_pt)
     extra_lines = new_lines - base_lines
     if extra_lines > 0:
-        remove_n = round(extra_lines * (_TITLE_LINE_PT / _EMPTY_LINE_PT))
+        # 只删除实际多出的视觉行对应的高度（用更保守的换算：1行标题 ≈ 1.5 行空行）
+        # 不加额外安全余量，否则会把校名挤到第2页
+        remove_n = max(1, round(extra_lines * 1.5))
         removed = compress_cover_gap(cover, remove_n)
-        print(f"   题目多出 {extra_lines} 行 → 压缩封面空行 {removed} 个（保校名块于首页底部）")
+        print(f"   题目多出 {extra_lines} 行 → 压缩封面空行 {removed} 个（保校名+年月于首页底部）")
 
     return n
 
@@ -391,6 +448,36 @@ def replace_cover_titles(cover: Document, cn, en):
 # ---------------------------------------------------------------------------
 # 封面区元素构建 & 注入
 # ---------------------------------------------------------------------------
+def _strip_foreign_attributes(elems):
+    """删除 cover elems 中属于"非核心"命名空间的属性（如 w14:paraId / w14:docId）。
+
+    这些是 Word 给段落/运行自动添加的内部 ID，与版式渲染无关；删除后 Word
+    在打开文档时会自动重建。关键作用是：避免把带 w14:* 属性的封面元素 deepcopy
+    注入到「根 <w:document> 未声明 w14 命名空间」的引擎产物后，Word 因遇到未声明
+    前缀而报"文件可能已经损坏"。
+
+    保留的命名空间：w(正文) / r(关系，如 r:id) / xml(xml:space 等)。
+    """
+    KEEP = {
+        W,
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        "http://www.w3.org/XML/1998/namespace",
+    }
+    def _walk(e):
+        if not isinstance(e.tag, str):
+            return
+        for k in list(e.attrib.keys()):
+            if not isinstance(k, str):
+                continue
+            ns = etree.QName(k).namespace
+            if ns not in KEEP:
+                del e.attrib[k]
+        for c in e:
+            _walk(c)
+    for e in elems:
+        _walk(e)
+
+
 def build_cover_elems(cover: Document):
     """返回封面模板 body 下所有子元素的深拷贝，并保留其原始分节结构。
 
@@ -408,6 +495,9 @@ def build_cover_elems(cover: Document):
     cover_body = cover.element.body
     children = list(cover_body)
     elems = [copy.deepcopy(c) for c in children]
+
+    # 剥掉外部命名空间属性（w14:paraId 等），避免注入后 Word 报损坏
+    _strip_foreign_attributes(elems)
 
     # 把模板末尾的 body sectPr 取下来，准备挂到封面区最后一个段落
     last_sectPr = None
@@ -446,6 +536,7 @@ def inject_cover(target: Document, cover_elems):
     if cut is None:
         print("  [跳过封面替换] 未找到摘要标题，不删除封面区")
         return False
+
     to_remove = []
     for child in body:
         if child is cut:
@@ -456,7 +547,94 @@ def inject_cover(target: Document, cover_elems):
     for el in reversed(cover_elems):
         body.insert(0, el)
 
+    # —— 确保中文扉页与英文封面之间存在空白页 ——
+    # 锚定模板里靠 5 个空段自然撑出空白页；但当封面接在长文档前面时，
+    # Word 的全局 Repaginate 可能因后续分节干扰而合并页面。
+    # 这里做确定性保护：若检测到「中文扉页表格」和「Classified Index」之间没有
+    # nextPage 分节符 / 硬分页，则插入一个 nextPage 分节符强制空白页。
+    _ensure_blank_page_between_cn_en_covers(body)
+
     return True
+
+
+def _ensure_blank_page_between_cn_en_covers(body):
+    """在中文扉页(含信息表)与英文封面(Classified Index)之间确保有一张空白页。
+
+    机制（确定性，不依赖溢出撑页）：
+      中文扉页结束 → 插入一个"硬分页空段"(<w:br w:type="page"/>) → 英文封面首段
+      自带 <w:br w:type="page"/>。两道硬分页之间恰好夹着一页空白页。
+
+    插入的是"分页空段"而非 nextPage 分节符——前者不创建新节、不触碰
+    页眉/页脚继承，对 Word 兼容性更稳妥；后者会新建一节，在部分严格
+    解析环境下可能触发误报。
+    """
+    W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    def q(t): return f"{{{W}}}{t}"
+
+    children = list(body)
+    cn_end = -1       # 中文扉页表格末尾索引
+    en_start = -1     # 英文封面起始索引(Classified Index)
+
+    for i, el in enumerate(children[:120]):  # 封面区通常在前 120 个元素内
+        ln = etree.QName(el).localname
+        if ln == "p":
+            t = "".join(el.itertext()).strip()
+            if ("授予学位单位" in t) or ("哈尔滨工业大学" in t and "分类" not in t and "Date" not in t):
+                cn_end = i
+            if "Classified Index" in t:
+                en_start = i
+                break
+        elif ln == "tbl":
+            txt = "".join(el.itertext())
+            if "导师" in txt or "学科" in txt:
+                cn_end = i
+
+    if cn_end < 0 or en_start < 0 or cn_end >= en_start:
+        return  # 未找到预期结构，不改动
+
+    # 是否已在中英文封面"之间"(不含英文封面自身)存在硬分页 → 已保证空白页，跳过
+    def _has_page_break(el):
+        if etree.QName(el).localname != "p":
+            return False
+        pPr = el.find(q("pPr"))
+        if pPr is not None:
+            if pPr.find(q("sectPr")) is not None:
+                return True
+            if pPr.find(q("pageBreakBefore")) is not None:
+                return True
+        for br in el.iter(q("br")):
+            if br.get(q("type")) == "page":
+                return True
+        return False
+
+    for i in range(cn_end + 1, en_start):
+        if _has_page_break(children[i]):
+            return  # 已有分页保护，空白页已保证
+
+    # 英文封面自身是否带硬分页（自带 br=page 或 pageBreakBefore）
+    en_has_pb = _has_page_break(children[en_start]) if en_start < len(children) else False
+
+    # 在中文扉页后插入硬分页空段
+    p = OxmlElement("w:p")
+    r = OxmlElement("w:r")
+    br = OxmlElement("w:br")
+    br.set(q("type"), "page")
+    r.append(br)
+    p.append(r)
+    body.insert(cn_end + 1, p)
+
+    # 若英文封面自身没有硬分页，则给它加 pageBreakBefore，确保两段分页 = 一张空白页
+    if not en_has_pb and en_start < len(children):
+        en_el = children[en_start]
+        if etree.QName(en_el).localname == "p":
+            pPr = en_el.find(q("pPr"))
+            if pPr is None:
+                pPr = OxmlElement("w:pPr")
+                en_el.insert(0, pPr)
+            pbb = OxmlElement("w:pageBreakBefore")
+            pPr.append(pbb)
+
+    print(f"   已在中文扉页与英文封面之间插入硬分页空段，保证一张空白页")
 
 
 # ---------------------------------------------------------------------------
