@@ -31,8 +31,6 @@ import os
 import shutil
 import subprocess
 import sys
-import urllib.request
-from urllib.parse import quote
 
 # 父进程 stdout/stderr 强制 UTF-8：中文 Windows 控制台默认 GBK，直接 print 中文
 # 或 ℹ 等符号会 UnicodeEncodeError 崩溃。子进程编码由 child_env 另行保证。
@@ -45,21 +43,10 @@ except Exception:
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ENGINE_ROOT = SCRIPT_DIR
 
-# 发布版不上传二进制 .docx 资源（小红书 SkillHub 仅允许代码/文本类扩展名），
-# 故本地缺 input/封面.docx 等资源时，从 GitHub raw(main) 自动下载补齐，使纯净版也能跑。
-GITHUB_RAW_BASE = "https://raw.githubusercontent.com/hasuanmi/HIT-md2docx/main"
-
-def ensure_asset(rel_path: str, base_dir: str) -> str:
-    """本地缺 .docx 等资源时，从 GitHub raw(main) 下载补齐，使不含二进制资源的发布版也能跑。"""
-    local = os.path.join(base_dir, rel_path)
-    if os.path.isfile(local):
-        return local
-    encoded = "/".join(quote(seg, safe="") for seg in rel_path.split("/"))
-    url = f"{GITHUB_RAW_BASE}/{encoded}"
-    os.makedirs(os.path.dirname(local), exist_ok=True)
-    print(f"  [封面资源] 本地缺失 {rel_path}，从 GitHub 下载补齐…")
-    urllib.request.urlretrieve(url, local)
-    return local
+# 发布版（小红书 SkillHub 等）不含二进制资源（.docx/.jpeg/.png），
+# 运行时若本地缺 input/封面.docx 等资源，由 thesis_md2docx._remote_assets.ensure_asset
+# 从 GitHub raw(main) 自动下载补齐，使纯净代码版也能跑。
+from thesis_md2docx._remote_assets import ensure_asset
 
 
 def dump_headings_and_exit(input_md: str, profile_name: str, front_matter):

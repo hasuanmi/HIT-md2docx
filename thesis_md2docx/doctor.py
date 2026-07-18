@@ -131,6 +131,18 @@ def _check_profiles() -> int:
 
 def _check_cover_assets() -> int:
     status = 0
+    # 发布版（小红书 SkillHub 等）不含二进制资源（.jpeg/.png），
+    # 运行时若本地缺失，先从 GitHub raw 补齐，使纯净版也能通过自检。
+    try:
+        from ._remote_assets import ensure_asset
+    except Exception:
+        ensure_asset = None  # type: ignore[assignment]
+
+    if not DEFAULT_COVER_ASSETS_DIR.is_dir():
+        # 目录可能不存在（git archive 不保留空目录），先尝试补齐资源以建目录。
+        if ensure_asset is not None:
+            ensure_asset(COVER_EMBLEM_NAME, str(DEFAULT_COVER_ASSETS_DIR))
+            ensure_asset(COVER_WORDMARK_NAME, str(DEFAULT_COVER_ASSETS_DIR))
     if not DEFAULT_COVER_ASSETS_DIR.is_dir():
         _print_check(False, f"default cover asset directory not found: {DEFAULT_COVER_ASSETS_DIR}")
         return 1
@@ -138,6 +150,8 @@ def _check_cover_assets() -> int:
     _print_check(True, f"default cover asset directory: {DEFAULT_COVER_ASSETS_DIR}")
     for filename in [COVER_EMBLEM_NAME, COVER_WORDMARK_NAME]:
         path = DEFAULT_COVER_ASSETS_DIR / filename
+        if not path.is_file() and ensure_asset is not None:
+            ensure_asset(filename, str(DEFAULT_COVER_ASSETS_DIR))
         if path.is_file():
             _print_check(True, f"cover asset: {filename}")
         else:
