@@ -43,10 +43,10 @@ except Exception:
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ENGINE_ROOT = SCRIPT_DIR
 
-# 发布版（小红书 SkillHub 等）不含二进制资源（.docx/.jpeg/.png），
-# 运行时若本地缺 input/封面.docx 等资源，由 thesis_md2docx._remote_assets.ensure_asset
-# 从 GitHub raw(main) 自动下载补齐，使纯净代码版也能跑。
-from thesis_md2docx._remote_assets import ensure_asset
+# 发布版（小红书 SkillHub 等）不能携带 .docx/.jpeg/.png 等二进制文件，
+# 故把必需的封面模板和校徽图以 base64 内嵌到 thesis_md2docx._embedded_assets，
+# 运行时若本地缺失，自动从本模块写出，保持包体纯文本、无需联网下载。
+from thesis_md2docx._embedded_assets import extract_asset as ensure_asset
 
 
 def dump_headings_and_exit(input_md: str, profile_name: str, front_matter):

@@ -34,3 +34,19 @@ example/output.docx
 
 # npm 依赖（公式转换用，按需 `npm install --prefix thesis_md2docx/math/latex2omml_node`）
 node_modules/
+
+# runtime-generated heading dictionaries
+heading_translations.json
+input/heading_translations.json
+skill/heading_translations.json
+example/heading_translations.json
+heading_translations.llm.json
+
+# RedSkill / temporary tooling
+.redskill_tmp/
+_tmp_debug_skillhub.mjs
+_tmp_login_out.txt
+_trash_20260718/
+HIT-md2docx-github-*.zip
+HIT-md2docx-skill-standalone.zip
+skills/

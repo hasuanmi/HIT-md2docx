@@ -26,8 +26,8 @@ ENV_MODEL = "HITMD2DOCX_LLM_MODEL"
 # 缓存文件名：与 heading_translations.json 放同一目录（markdown_dir）
 LLM_CACHE_FILENAME = "heading_translations.llm.json"
 
-_DEFAULT_BASE_URL = "https://api.openai.com/v1"
-_DEFAULT_MODEL = "gpt-4o-mini"
+_DEFAULT_BASE_URL = ""
+_DEFAULT_MODEL = ""
 
 _SYSTEM_PROMPT = (
     "You are a translator for Chinese academic thesis chapter headings. "
@@ -61,10 +61,14 @@ def load_llm_config(markdown_dir: Path | None) -> dict | None:
     api_key = os.environ.get(ENV_API_KEY)
     if not api_key:
         return None
+    base_url = os.environ.get(ENV_BASE_URL, _DEFAULT_BASE_URL)
+    model = os.environ.get(ENV_MODEL, _DEFAULT_MODEL)
+    if not base_url or not model:
+        return None
     return {
         "api_key": api_key,
-        "base_url": os.environ.get(ENV_BASE_URL, _DEFAULT_BASE_URL),
-        "model": os.environ.get(ENV_MODEL, _DEFAULT_MODEL),
+        "base_url": base_url,
+        "model": model,
     }
 
 

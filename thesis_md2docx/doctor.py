@@ -14,6 +14,7 @@ from .constants import (
     LATEX2OMML_NODE_DIR,
     LATEX2OMML_NODE_REQUIRED_MODULES,
     LATEX2OMML_NODE_SCRIPT,
+    TOOL_ROOT,
 )
 from .layout import validate_front_matter_plan
 from .pdf.main import run_doctor as run_pdf_doctor
@@ -131,18 +132,13 @@ def _check_profiles() -> int:
 
 def _check_cover_assets() -> int:
     status = 0
-    # 发布版（小红书 SkillHub 等）不含二进制资源（.jpeg/.png），
-    # 运行时若本地缺失，先从 GitHub raw 补齐，使纯净版也能通过自检。
-    try:
-        from ._remote_assets import ensure_asset
-    except Exception:
-        ensure_asset = None  # type: ignore[assignment]
+    # 发布版（小红书 SkillHub 等）不能携带 .jpeg/.png 二进制文件，
+    # 所需的校徽/字标以 base64 内嵌到 _embedded_assets，首次自检时写出。
+    from ._embedded_assets import extract_asset
 
     if not DEFAULT_COVER_ASSETS_DIR.is_dir():
-        # 目录可能不存在（git archive 不保留空目录），先尝试补齐资源以建目录。
-        if ensure_asset is not None:
-            ensure_asset(COVER_EMBLEM_NAME, str(DEFAULT_COVER_ASSETS_DIR))
-            ensure_asset(COVER_WORDMARK_NAME, str(DEFAULT_COVER_ASSETS_DIR))
+        extract_asset(f"thesis_md2docx/resources/{COVER_EMBLEM_NAME}", str(TOOL_ROOT))
+        extract_asset(f"thesis_md2docx/resources/{COVER_WORDMARK_NAME}", str(TOOL_ROOT))
     if not DEFAULT_COVER_ASSETS_DIR.is_dir():
         _print_check(False, f"default cover asset directory not found: {DEFAULT_COVER_ASSETS_DIR}")
         return 1
@@ -150,8 +146,8 @@ def _check_cover_assets() -> int:
     _print_check(True, f"default cover asset directory: {DEFAULT_COVER_ASSETS_DIR}")
     for filename in [COVER_EMBLEM_NAME, COVER_WORDMARK_NAME]:
         path = DEFAULT_COVER_ASSETS_DIR / filename
-        if not path.is_file() and ensure_asset is not None:
-            ensure_asset(filename, str(DEFAULT_COVER_ASSETS_DIR))
+        if not path.is_file():
+            extract_asset(f"thesis_md2docx/resources/{filename}", str(TOOL_ROOT))
         if path.is_file():
             _print_check(True, f"cover asset: {filename}")
         else:

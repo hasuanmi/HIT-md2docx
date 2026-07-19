@@ -1,6 +1,6 @@
 ---
-name: HITmd2docx
-description: 毕业论文格式化 Agent（哈工大本科/硕士/博士通用）。上传论文 Markdown，一键生成符合哈工大《学位论文格式要求及审查要点》（深圳研究生院）的标准 Word 文档，并输出格式问题清单。支持本科/硕士/博士三种层次——生成前先与用户确认层次，封面/页眉/页脚的「硕士/master」自动改写为「本科/bachelor」或「博士/doctor」。固定流程：确认层次 → 文档读取 → MD转富文本 → 模板填充 → 封面注入 → 规范校验 → 自动修复 → 层次适配 → 导出报告。适用于 HIT 学位论文 Markdown→DOCX/PDF 的撰写、检查与导出。
+name: hit-md2docx
+description: 上传哈工大学位论文 Markdown，生成符合学校规范的 Word 文档与格式问题清单。支持本科、硕士、博士三层次。
 ---
 
 # 毕业论文格式化 Agent · HIT 学位论文（Skill 集合总编排）
