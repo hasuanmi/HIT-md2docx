@@ -69,6 +69,60 @@ def _read_front_titles(front_path: str):
     return cn, en
 
 
+# 占位符特征：模板里写死的「（请替换…）/【请填写】/To Be Filled」都算未提供
+_PLACEHOLDER_HINTS = ("请替换", "待填写", "To Be Filled", "Please Fill",
+                      "示例", "样例", "xxx", "XXX", "（请", "【请")
+def _is_placeholder(val: str | None) -> bool:
+    if not val:
+        return True
+    v = val.strip()
+    if not v:
+        return True
+    if v.startswith("（") or v.startswith("("):
+        return True
+    if v.startswith("【") or v.startswith("["):
+        return True
+    return any(h in v for h in _PLACEHOLDER_HINTS)
+
+
+# 正文首个 H1 题目：跳过「第X章」、以数字开头的章号、摘要/ABSTRACT
+_MD_H1_TITLE = re.compile(r"^#\s+(?!第[一二三四五六七八九十零\d]+章)(?!\d)(.+)$")
+_MD_TITLE_SKIP = {"摘要", "ABSTRACT", "Abstract"}
+
+
+def _read_md_title(md_path: str):
+    """从（预处理后的）论文 md 取题名，作封面题名兜底。
+
+    优先级：正文里的 `论文题目：`/`中文题目：` 行 → 第一个 H1 标题
+    （用户最常见写法就是把题名写成首行 `# 《…》…`）。取不到返回 (None, None)。
+    """
+    if not md_path or not os.path.exists(md_path):
+        return None, None
+    try:
+        with open(md_path, encoding="utf-8") as f:
+            lines = f.readlines()
+    except Exception:
+        return None, None
+    cn = en = None
+    for s in (ln.strip() for ln in lines):
+        if cn is None and (s.startswith("论文题目：") or s.startswith("论文题目:")):
+            cn = s.split("：", 1)[-1].split(":", 1)[-1].strip()
+        elif cn is None and (s.startswith("中文题目：") or s.startswith("中文题目:")):
+            cn = s.split("：", 1)[-1].split(":", 1)[-1].strip()
+        elif en is None and (s.startswith("英文题目：") or s.startswith("英文题目:")):
+            en = s.split("：", 1)[-1].split(":", 1)[-1].strip()
+    if cn is None:
+        for s in (ln.strip() for ln in lines):
+            m = _MD_H1_TITLE.match(s)
+            if m:
+                cand = m.group(1).strip()
+                if cand in _MD_TITLE_SKIP:
+                    continue
+                cn = cand
+                break
+    return cn, en
+
+
 def _extract_titles_from_doc(doc: Document):
     """从 docx 现有封面区（开头到第一个摘要）提取中/英文题目，作兜底。"""
     cn = en = en_lines = None
@@ -127,12 +181,22 @@ def _llm_translate_title(cn: str, markdown_dir=None):
         return None
 
 
-def extract_titles(front_path, doc, cli_cn=None, cli_en=None, markdown_dir=None):
-    cn, en = _read_front_titles(front_path)
-    if cli_cn:
-        cn = cli_cn
-    if cli_en:
-        en = cli_en
+def extract_titles(front_path, doc, cli_cn=None, cli_en=None, markdown_dir=None, md_path=None):
+    fcn, fen = _read_front_titles(front_path)
+    mcn, men = _read_md_title(md_path)
+    # 占位符视为「未提供」，避免覆盖正文真实题名（默认无 --front-matter
+    # 时 front_path 是写死占位符的模板，必须让位给正文 md 的首行 H1）
+    if _is_placeholder(fcn):
+        fcn = None
+    if _is_placeholder(fen):
+        fen = None
+    if _is_placeholder(mcn):
+        mcn = None
+    if _is_placeholder(men):
+        men = None
+    # 优先级：CLI > front_matter > 正文 md（首行 H1 / 论文题目：行）> docx 提取
+    cn = cli_cn or fcn or mcn
+    en = cli_en or fen or men
     if not cn or not en:
         dcn, den = _extract_titles_from_doc(doc)
         cn = cn or dcn
@@ -850,12 +914,15 @@ def main():
     ap.add_argument("--en-title", default=None, help="英文题目（优先于 front_matter）")
     ap.add_argument("--markdown-dir", default=None,
                     help="论文 md 所在目录，用于加载 .env / LLM 翻译配置（与英文目录同一来源）")
+    ap.add_argument("--source-md", default=None,
+                    help="（预处理后的）论文 md 路径；用于把首行 H1 / 论文题目： 识别为封面题名兜底")
     ap.add_argument("--out", default=None, help="输出路径，默认覆盖原文件")
     ap.add_argument("--no-spacing", action="store_true", help="跳过前置部分行距对齐")
     args = ap.parse_args()
 
     target = Document(args.docx)
-    cn, en = extract_titles(args.front_matter, target, args.cn_title, args.en_title, args.markdown_dir)
+    cn, en = extract_titles(args.front_matter, target, args.cn_title, args.en_title,
+                            args.markdown_dir, args.source_md)
     print(f"题目: 中文={cn!r} 英文={en!r}")
 
     cover_changed = False

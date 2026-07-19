@@ -294,6 +294,9 @@ def main():
         ]
         if args.front_matter:
             cmd2 += ["--front-matter", args.front_matter]
+        # 把（预处理后的）论文 md 传给 cover_inject，使其能把首行 H1 /
+        # 论文题目： 识别为封面题名兜底（默认无 --front-matter 时也能正确填题名）
+        cmd2 += ["--source-md", pre_md if (pre_md and os.path.isfile(pre_md)) else input_md]
         r2 = subprocess.run(cmd2, cwd=ENGINE_ROOT,
                             capture_output=True, text=True,
                             encoding="utf-8", errors="replace", env=child_env)
