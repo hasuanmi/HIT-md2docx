@@ -8,7 +8,7 @@ metadata:
   repository: https://github.com/hasuanmi/HIT-md2docx
   category: document-processing
   backup-category: document-processing
-  version: 1.0.2
+  version: 1.0.3
 ---
 
 # 毕业论文格式化 Agent · HIT 学位论文（Skill 集合总编排）

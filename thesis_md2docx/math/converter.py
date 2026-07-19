@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 import json
 import re
+import shutil
 import subprocess
 import sys
 from xml.etree import ElementTree as ET
@@ -84,6 +85,46 @@ class MathConverter:
         self.fallback_items: set[tuple[str, bool]] = set()
         self.item_errors: list[str] = []
         self.warning_reported = False
+        self._auto_install_attempted = False
+
+    def _try_auto_install(self) -> bool:
+        """Best-effort: install the latex2omml_node helper deps if npm/node are
+        available. Returns True if the required modules are now present. Runs at
+        most once, so end users only pay the install cost on first run."""
+        if self._auto_install_attempted:
+            return False
+        self._auto_install_attempted = True
+        if all(p.exists() for p in LATEX2OMML_NODE_REQUIRED_MODULES):
+            return True
+        npm = shutil.which("npm")
+        node = shutil.which("node")
+        if not npm or not node:
+            return False
+        print(
+            "  [公式依赖] 检测到 latex2omml_node 未安装，尝试自动 npm install（首次运行，需联网）…",
+            file=sys.stderr,
+        )
+        try:
+            res = subprocess.run(
+                [npm, "install"],
+                cwd=str(LATEX2OMML_NODE_DIR),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=300,
+            )
+        except Exception as exc:  # noqa: BLE001 - 自动安装失败不应中断整篇转换
+            print(f"  [公式依赖] 自动安装出错：{exc}", file=sys.stderr)
+            return False
+        if res.returncode != 0:
+            last = (res.stderr or res.stdout or "").strip().splitlines()
+            print(
+                f"  [公式依赖] 自动安装失败：{last[-1] if last else 'unknown'}",
+                file=sys.stderr,
+            )
+            return False
+        return all(p.exists() for p in LATEX2OMML_NODE_REQUIRED_MODULES)
 
     def _remember_failure(self, reason: str) -> None:
         self.failed = True
@@ -105,6 +146,12 @@ class MathConverter:
             return False
         missing_modules = [str(path) for path in LATEX2OMML_NODE_REQUIRED_MODULES if not path.exists()]
         if missing_modules:
+            if self._try_auto_install() and all(
+                p.exists() for p in LATEX2OMML_NODE_REQUIRED_MODULES
+            ):
+                # 自动安装成功，直接进入就绪状态，用户无感
+                self.ready = True
+                return True
             self._remember_failure(
                 "formula converter dependencies are not installed"
             )
@@ -295,12 +342,18 @@ class MathConverter:
         if self.failed_reason:
             install_dir = str(LATEX2OMML_NODE_DIR.resolve())
             print(
-                (
-                    "[warning] Word formula conversion is unavailable: "
-                    f"{self.failed_reason}. {fallback_count} formula(s) were kept as raw LaTeX.\n"
-                    "          To enable Word equations, install the helper dependencies with:\n"
-                    f"          cd {install_dir}\n"
-                    "          npm install"
+                "\n".join(
+                    [
+                        "",
+                        "  ⚠️ 公式未转成 Word 原生公式：本文 {} 个公式将保留为原始 LaTeX 源码".format(fallback_count),
+                        "     （Word 中显示为代码、不可编辑为公式，学校查重/盲审一般不影响，但排版不美观）。",
+                        "     原因：{}".format(self.failed_reason),
+                        "     如需转成可编辑的 Word 公式，请执行一次（仅首次需要，需联网 + 已装 Node.js）：",
+                        "        cd {}".format(install_dir),
+                        "        npm install",
+                        "     装好后重新运行本命令即可；下次会自动复用，无需再装。",
+                        "",
+                    ]
                 ),
                 file=sys.stderr,
             )
