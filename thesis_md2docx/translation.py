@@ -26,8 +26,11 @@ ENV_MODEL = "HITMD2DOCX_LLM_MODEL"
 # 缓存文件名：与 heading_translations.json 放同一目录（markdown_dir）
 LLM_CACHE_FILENAME = "heading_translations.llm.json"
 
-_DEFAULT_BASE_URL = ""
-_DEFAULT_MODEL = ""
+# 默认 OpenAI 兼容端点与模型：仅当用户显式提供自己的 API key 时才启用，
+# 且仅用于「用户自带 key 的 API 兜底」模式。skill 的主翻译路径是 agent 自带
+# LLM（见 SKILL.md Step 2.5），本默认值只是让「只填了 key」的用户也能直接用。
+_DEFAULT_BASE_URL = "https://api.openai.com/v1"
+_DEFAULT_MODEL = "gpt-4o-mini"
 
 _SYSTEM_PROMPT = (
     "You are a translator for Chinese academic thesis chapter headings. "
@@ -54,17 +57,19 @@ def _load_dotenv(path: Path | None) -> None:
 
 
 def load_llm_config(markdown_dir: Path | None) -> dict | None:
-    """读取 LLM 配置。未设置 API key 时返回 None（表示不启用兜底）。"""
+    """读取 LLM 配置。未设置 API key 时返回 None（表示不启用兜底）。
+
+    只需 API key 即可启用：base_url / model 未设置时回退到 OpenAI 兼容默认值，
+    避免「用户只填了 key 却静默不翻」的坑。
+    """
     for d in (markdown_dir, Path.cwd()):
         if d:
             _load_dotenv(Path(d) / ".env")
     api_key = os.environ.get(ENV_API_KEY)
     if not api_key:
         return None
-    base_url = os.environ.get(ENV_BASE_URL, _DEFAULT_BASE_URL)
-    model = os.environ.get(ENV_MODEL, _DEFAULT_MODEL)
-    if not base_url or not model:
-        return None
+    base_url = os.environ.get(ENV_BASE_URL) or _DEFAULT_BASE_URL
+    model = os.environ.get(ENV_MODEL) or _DEFAULT_MODEL
     return {
         "api_key": api_key,
         "base_url": base_url,
