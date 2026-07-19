@@ -680,21 +680,37 @@ ENGLISH_ORDINALS = {
 }
 
 
+# 静态内置的默认标题翻译：只保留最通用、最稳定的博士论文后置章节翻译。
+# 用户论文目录下的 heading_translations.json 可以覆盖这些默认值。
+_DEFAULT_HEADING_TRANSLATIONS: dict[str, str] = {
+    normalize_heading_key("结论"): "Conclusions",
+    normalize_heading_key("参考文献"): "References",
+    normalize_heading_key("攻读博士学位期间取得的科研成果"): "Innovative achievements for Ph.D",
+    normalize_heading_key("哈尔滨工业大学学位论文原创性声明和使用权限"): "Statement of copyright and letter of authorization",
+    normalize_heading_key("致谢"): "Acknowledgments",
+    normalize_heading_key("个人简历"): "Resume",
+}
+
+
 def _load_heading_translations(markdown_dir: Path | None) -> dict[str, str]:
-    """从 markdown 所在目录加载 heading_translations.json（中英文目录标题映射）。"""
+    """从 markdown 所在目录加载 heading_translations.json，并与内置默认翻译合并。"""
+    translations = dict(_DEFAULT_HEADING_TRANSLATIONS)
     if markdown_dir is None:
-        return {}
+        return translations
     path = markdown_dir / "heading_translations.json"
     if not path.exists():
-        return {}
+        return translations
     try:
         import json
 
         data = json.loads(path.read_text(encoding="utf-8"))
         # 加载即归一化 key：字典里写弯引号/全角标点也能命中论文的直引号标题
-        return {normalize_heading_key(k): v for k, v in data.items()}
+        user_translations = {normalize_heading_key(k): v for k, v in data.items()}
+        # 用户翻译优先级高于内置默认
+        translations.update(user_translations)
     except Exception:
-        return {}
+        pass
+    return translations
 
 
 def _format_toc_chinese_number(entry: TocEntry) -> TocEntry:
