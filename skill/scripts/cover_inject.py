@@ -30,6 +30,7 @@ cover_inject.py — HIT 硕士论文"封面与前置部分版式注入"（标准
 from __future__ import annotations
 import argparse
 import copy
+import json
 import os
 import re
 import sys
@@ -123,6 +124,35 @@ def _read_md_title(md_path: str):
     return cn, en
 
 
+def _read_json_title(markdown_dir, cn):
+    """从 <md同目录>/heading_translations.json 查封面英文题名（agent 预翻译）。
+
+    与英文目录同一份字典：agent 在 Step 2.5 已将「论文总标题 → 英文」
+    翻好写回该文件（见 generate.py --dump-headings 对总标题的导出）。
+    这里用归一化后的中文总题 key 精确命中，使封面英文题也能零 key 自动翻译。
+    找不到文件 / key 未命中 / 值为空时返回 None，交由 docx 提取或 LLM 兜底。
+    """
+    if not cn or not markdown_dir:
+        return None
+    jp = Path(markdown_dir) / "heading_translations.json"
+    if not jp.exists():
+        return None
+    try:
+        data = json.loads(jp.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    try:
+        from thesis_md2docx.toc import normalize_heading_key
+    except Exception:
+        def normalize_heading_key(x):
+            return (x or "").strip()
+    key = normalize_heading_key(cn)
+    for k, v in data.items():
+        if normalize_heading_key(k) == key and v:
+            return v
+    return None
+
+
 def _extract_titles_from_doc(doc: Document):
     """从 docx 现有封面区（开头到第一个摘要）提取中/英文题目，作兜底。"""
     cn = en = en_lines = None
@@ -197,6 +227,11 @@ def extract_titles(front_path, doc, cli_cn=None, cli_en=None, markdown_dir=None,
     # 优先级：CLI > front_matter > 正文 md（首行 H1 / 论文题目：行）> docx 提取
     cn = cli_cn or fcn or mcn
     en = cli_en or fen or men
+    # 新增：agent 在 Step 2.5 已把「论文总标题 → 英文」也翻好写回同一份
+    # heading_translations.json（见 generate.py --dump-headings 对总标题的导出）。
+    # 用归一化中文总题精确命中，实现封面英文题零 key 自动翻译，与英文目录同源。
+    if not en and cn:
+        en = _read_json_title(markdown_dir, cn)
     if not cn or not en:
         dcn, den = _extract_titles_from_doc(doc)
         cn = cn or dcn

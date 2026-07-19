@@ -158,6 +158,26 @@ def dump_headings_and_exit(input_md: str, profile_name: str, front_matter):
             continue
         out[key] = ""
 
+    # 4) 论文总标题（封面英文题）也需翻译：用与 cover_inject.extract_titles
+    #    相同的首行 H1 / 论文题目： 提取逻辑取出中文总题，作为 key 导出，
+    #    使 agent 一次性把「章节 + 封面总题」都翻好、写回同一份 json；
+    #    extract_titles 再用归一化中文总题精确命中，实现封面英文题零 key 翻译。
+    try:
+        import importlib.util as _ilu
+        _spec = _ilu.spec_from_file_location(
+            "cover_inject_mod",
+            os.path.join(ENGINE_ROOT, "skill", "scripts", "cover_inject.py"),
+        )
+        _ci = _ilu.module_from_spec(_spec)
+        _spec.loader.exec_module(_ci)
+        _thesis_cn, _ = _ci._read_md_title(src)
+        if _thesis_cn:
+            _tk = _key_of(_thesis_cn)
+            if _tk and _tk not in existing and _tk not in out:
+                out[_tk] = ""
+    except Exception:
+        pass  # 提取失败不影响章节翻译导出
+
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if pre_md and os.path.isfile(pre_md):
         try:
@@ -297,6 +317,9 @@ def main():
         # 把（预处理后的）论文 md 传给 cover_inject，使其能把首行 H1 /
         # 论文题目： 识别为封面题名兜底（默认无 --front-matter 时也能正确填题名）
         cmd2 += ["--source-md", pre_md if (pre_md and os.path.isfile(pre_md)) else input_md]
+        # 把论文 md 所在目录也传给 cover_inject，使其能从同目录的
+        # heading_translations.json 查封面英文题名（agent 预翻译，零 key）
+        cmd2 += ["--markdown-dir", os.path.dirname(os.path.abspath(input_md))]
         r2 = subprocess.run(cmd2, cwd=ENGINE_ROOT,
                             capture_output=True, text=True,
                             encoding="utf-8", errors="replace", env=child_env)
